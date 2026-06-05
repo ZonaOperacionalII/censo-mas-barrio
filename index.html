@@ -19,7 +19,7 @@
             background-color: var(--gris-fondo); height: 100%; overflow: hidden;
         }
 
-        /* --- VISTA DE LOGIN ESTILO S.I.S.C.A. --- */
+        /* --- VISTA DE LOGIN --- */
         #login-view {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             height: 100vh; background-color: var(--azul-ministerio);
@@ -34,32 +34,24 @@
         .login-box p.subtitle { color: #666; font-size: 0.85rem; margin-bottom: 20px; font-weight: 500; }
         .input-group { margin-bottom: 1.2rem; text-align: left; }
         .input-group label { display: block; font-size: 0.8rem; color: #333; margin-bottom: 5px; font-weight: bold; }
-        .input-group input {
-            width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px;
-            font-size: 1rem;
+        .input-group input, .input-group select {
+            width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;
         }
         .btn-ingresar {
             background-color: var(--azul-ministerio); color: var(--blanco); border: none;
             padding: 0.9rem; width: 100%; border-radius: 4px; font-size: 1rem;
             cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
         }
-        .btn-ingresar:active { background-color: #001f44; }
 
-        /* --- VISTA PRINCIPAL DE LA APP --- */
+        /* --- VISTA MAPA OPERATIVO --- */
         #app-view { display: none; height: 100vh; flex-direction: column; }
-        
-        /* Banner superior */
         .header {
             background-color: var(--blanco); padding: 12px 15px; display: flex;
             align-items: center; justify-content: space-between;
             border-bottom: 5px solid var(--azul-ministerio); z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .header-title { font-weight: 800; color: var(--azul-ministerio); font-size: 1.1rem; text-transform: uppercase; }
-        .btn-salir { background: transparent; border: 1px solid var(--azul-ministerio); color: var(--azul-ministerio); padding: 5px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        
         #mapa { flex: 1; width: 100%; z-index: 1; }
-        
-        /* Controles inferiores para el PCOP */
         .panel-inferior {
             background: var(--blanco); padding: 20px 15px; border-top: 1px solid #ddd;
             box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000;
@@ -72,8 +64,26 @@
         .btn-censar {
             background-color: #28a745; color: white; border: none; padding: 12px;
             width: 100%; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer;
-            margin-top: 10px; display: none; 
+            margin-top: 10px; display: block; /* FORZADO PARA PRUEBAS */
         }
+
+        /* --- VISTA DE AUDITORÍA (ADMIN) --- */
+        #admin-view {
+            display: none; height: 100vh; background: var(--gris-fondo); flex-direction: column; padding: 20px; overflow-y: auto;
+        }
+        .admin-table { width: 100%; text-align: left; border-collapse: collapse; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .admin-table th { padding: 12px; border-bottom: 2px solid var(--azul-ministerio); background: #eee; }
+        .admin-table td { padding: 10px; border-bottom: 1px solid #ddd; font-size: 0.9rem; }
+
+        /* --- MODAL DE CENSO EXTENDIDO --- */
+        .modal-container {
+            background: white; width: 95%; max-width: 450px; border-radius: 8px; padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto;
+        }
+        .seccion-titulo { background: #e9ecef; padding: 5px 10px; font-size: 0.85rem; font-weight: bold; color: var(--azul-ministerio); margin: 15px 0 10px 0; border-left: 4px solid var(--azul-ministerio); }
+        .check-group { display: flex; align-items: center; margin-bottom: 10px; }
+        .check-group input { transform: scale(1.3); margin-right: 10px; }
+        .check-group label { font-size: 0.9rem; font-weight: bold; color: #444; margin: 0; }
     </style>
 </head>
 <body>
@@ -82,11 +92,11 @@
         <div class="login-box">
             <h2>S.I.C.T.</h2> <p class="subtitle">PLAN MÁS BARRIO</p>
             <div class="input-group">
-                <label for="doc">Usuario (Documento)</label>
+                <label>Usuario (Documento)</label>
                 <input type="email" id="doc" placeholder="Ej: 12345678@policia.uy">
             </div>
             <div class="input-group">
-                <label for="pass">Contraseña</label>
+                <label>Contraseña</label>
                 <input type="password" id="pass" placeholder="***">
             </div>
             <button class="btn-ingresar" id="btn-login">Ingresar</button>
@@ -97,46 +107,83 @@
     <div id="app-view">
         <div class="header">
             <div class="header-title">Censo | Los Caracoles</div>
-            <button class="btn-salir" id="btn-logout">Salir</button>
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-admin-panel" style="display: none; background: #ffc107; color: #000; border: none; padding: 5px 10px; border-radius: 4px; font-weight: bold; cursor: pointer;">Auditoría</button>
+                <button style="background: transparent; border: 1px solid var(--azul-ministerio); color: var(--azul-ministerio); padding: 5px 10px; border-radius: 4px; font-weight: bold; cursor: pointer;" id="btn-logout">Salir</button>
+            </div>
         </div>
-        
         <div id="mapa"></div>
-        
         <div class="panel-inferior">
             <div class="info-padr" id="resultado-padron">📍 Modo de Prueba Activo</div>
             <button class="btn-ubicar" id="btn-ubicar">Detectar Padrón GPS</button>
-            <button class="btn-censar" id="btn-censar" style="display: block;">Iniciar Relevamiento</button>
+            <button class="btn-censar" id="btn-censar">Iniciar Relevamiento</button>
         </div>
     </div>
 
-    <div id="modal-censo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,40,85,0.8); z-index: 2000; justify-content: center; align-items: center;">
-        <div style="background: white; width: 90%; max-width: 400px; border-radius: 8px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
-            <h3 style="color: var(--azul-ministerio); margin-top: 0; border-bottom: 2px solid var(--azul-ministerio); padding-bottom: 10px;">Registro de Habitante</h3>
+    <div id="admin-view">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="color: var(--azul-ministerio); margin: 0;">Log Operativo</h2>
+            <button id="btn-cerrar-admin" style="background: var(--azul-ministerio); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">Volver al Mapa</button>
+        </div>
+        <table class="admin-table">
+            <thead>
+                <tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr>
+            </thead>
+            <tbody id="tabla-logs"></tbody>
+        </table>
+    </div>
+
+    <div id="modal-censo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,40,85,0.9); z-index: 2000; justify-content: center; align-items: center;">
+        <div class="modal-container">
+            <h3 style="color: var(--azul-ministerio); margin-top: 0; text-align: center;">Formulario de Censo</h3>
             
-            <div class="input-group">
-                <label>Cédula de Identidad</label>
-                <input type="text" id="censo-ci" placeholder="Sin puntos ni guiones">
+            <div class="seccion-titulo">DATOS PERSONALES</div>
+            <div class="input-group"><input type="text" id="censo-ci" placeholder="Cédula (Sin puntos ni guiones)"></div>
+            <div style="display: flex; gap: 10px;">
+                <div class="input-group" style="flex: 1;"><input type="text" id="censo-nombre" placeholder="Nombre"></div>
+                <div class="input-group" style="flex: 1;"><input type="text" id="censo-apellido" placeholder="Apellido"></div>
+            </div>
+            <div class="input-group"><input type="text" id="censo-alias" placeholder="Alias / Apodo"></div>
+
+            <div class="seccion-titulo">INTELIGENCIA POLICIAL</div>
+            <div class="check-group">
+                <input type="checkbox" id="censo-antecedentes"> <label style="color: #dc3545;">Posee Antecedentes</label>
             </div>
             <div class="input-group">
-                <label>Nombre</label>
-                <input type="text" id="censo-nombre">
+                <input type="text" id="censo-vehiculos" placeholder="Vehículos asociados (Motos, Autos)">
             </div>
-            <div class="input-group">
-                <label>Apellido</label>
-                <input type="text" id="censo-apellido">
-            </div>
-            <div class="input-group">
-                <label>Alias / Apodo (Opcional)</label>
-                <input type="text" id="censo-alias">
-            </div>
-            <div class="input-group" style="display: flex; align-items: center; margin-top: 15px;">
-                <input type="checkbox" id="censo-antecedentes" style="width: auto; margin-right: 10px; transform: scale(1.5);">
-                <label style="margin: 0; color: #dc3545; font-weight: bold;">Posee Antecedentes Penales</label>
+            <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+                <div class="check-group"><input type="checkbox" id="censo-camaras"> <label>Cámaras CCTV</label></div>
+                <div class="check-group"><input type="checkbox" id="censo-perros"> <label>Perros Guardia</label></div>
+                <div class="check-group"><input type="checkbox" id="censo-armas"> <label>Armas (THATA)</label></div>
             </div>
 
+            <div class="seccion-titulo">RELEVAMIENTO SOCIAL (MIDES)</div>
+            <div class="input-group">
+                <select id="censo-tenencia">
+                    <option value="No especifica">Situación de Tenencia...</option>
+                    <option value="Propietario">Propietario</option>
+                    <option value="Inquilino">Inquilino</option>
+                    <option value="Ocupante">Ocupante</option>
+                    <option value="Cedida">Cedida</option>
+                </select>
+            </div>
+            <div style="display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 10px;">
+                <div class="check-group"><input type="checkbox" id="censo-ute"> <label>Conexión UTE</label></div>
+                <div class="check-group"><input type="checkbox" id="censo-ose"> <label>Conexión OSE</label></div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Menores a cargo</label>
+                    <input type="number" id="censo-menores" value="0" min="0">
+                </div>
+            </div>
+            <div class="check-group"><input type="checkbox" id="censo-escolaridad"> <label>Menores escolarizados</label></div>
+            <div class="check-group"><input type="checkbox" id="censo-discapacidad"> <label>Persona con discapacidad/postrada</label></div>
+
             <div style="display: flex; gap: 10px; margin-top: 25px;">
-                <button id="btn-cancelar-censo" style="flex: 1; padding: 10px; background: #6c757d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Cancelar</button>
-                <button id="btn-guardar-censo" style="flex: 1; padding: 10px; background: var(--azul-ministerio); color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Guardar</button>
+                <button id="btn-cancelar-censo" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Cancelar</button>
+                <button id="btn-guardar-censo" style="flex: 1; padding: 12px; background: var(--azul-ministerio); color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Guardar Datos</button>
             </div>
         </div>
     </div>
