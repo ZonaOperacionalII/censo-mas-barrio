@@ -1,198 +1,183 @@
-// 1. CONFIGURACIÓN DE SUPABASE
+// 1. CONFIGURACIÓN
 const SUPABASE_URL = 'https://maalgmxakmikryrmhloz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hYWxnbXhha21pa3J5cm1obG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzEzNTQsImV4cCI6MjA5NjE0NzM1NH0.Hdoh3Sct07fHVDb7YrEKe_zvryPXxLOvCMGLv-iseCs';
+const SUPABASE_ANON_KEY = 'eyJhbG... (PEGA_TU_CLAVE_ANON_AQUÍ)';
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 2. REFERENCIAS A LA INTERFAZ
-const loginView = document.getElementById('login-view');
-const appView = document.getElementById('app-view');
-const adminView = document.getElementById('admin-view');
-const btnLogin = document.getElementById('btn-login');
-const btnLogout = document.getElementById('btn-logout');
-const loginError = document.getElementById('login-error');
-const btnUbicar = document.getElementById('btn-ubicar');
-const btnCensar = document.getElementById('btn-censar');
-const resultadoPadron = document.getElementById('resultado-padron');
-const btnAdminPanel = document.getElementById('btn-admin-panel');
-const btnCerrarAdmin = document.getElementById('btn-cerrar-admin');
+const views = {
+    login: document.getElementById('login-view'),
+    app: document.getElementById('app-view'),
+    admin: document.getElementById('admin-view'),
+    search: document.getElementById('search-view')
+};
 
-let map;
-let marker;
+let map, marker;
+let padronUbicacionActual = "Desconocido"; // Guardará el padrón donde está parado el policía
 
-// 3. SEGURIDAD: VERIFICAR SESIÓN Y ROL
+// 2. SEGURIDAD Y ROLES
 async function checkSession() {
     const { data: { session } } = await db.auth.getSession();
-    if (session) {
-        validarRol(session.user.email);
-    }
+    if (session) validarRol(session.user.email);
 }
 checkSession();
 
 async function validarRol(email) {
-    const { data, error } = await db.from('administradores').select('*').eq('email', email);
-    const esAdmin = data && data.length > 0;
-    iniciarEntornoOperativo(esAdmin);
+    const { data } = await db.from('administradores').select('*').eq('email', email);
+    iniciarApp(data && data.length > 0);
 }
 
-// 4. LÓGICA DE INGRESO
-btnLogin.addEventListener('click', async () => {
-    const email = document.getElementById('doc').value;
-    const password = document.getElementById('pass').value;
-    
-    btnLogin.innerText = "Verificando...";
-    const { data, error } = await db.auth.signInWithPassword({ email: email, password: password });
+document.getElementById('btn-login').addEventListener('click', async () => {
+    const e = document.getElementById('doc').value;
+    const p = document.getElementById('pass').value;
+    document.getElementById('btn-login').innerText = "Verificando...";
+    const { error } = await db.auth.signInWithPassword({ email: e, password: p });
     
     if (error) {
-        loginError.style.display = 'block';
-        loginError.innerText = "Acceso denegado.";
-        btnLogin.innerText = "Ingresar";
+        document.getElementById('login-error').style.display = 'block';
+        document.getElementById('login-error').innerText = "Credenciales inválidas.";
+        document.getElementById('btn-login').innerText = "Ingresar";
     } else {
-        loginError.style.display = 'none';
-        validarRol(email);
+        document.getElementById('login-error').style.display = 'none';
+        validarRol(e);
     }
 });
 
-// 5. LÓGICA DE SALIDA
-btnLogout.addEventListener('click', async () => {
+document.getElementById('btn-logout').addEventListener('click', async () => {
     await db.auth.signOut();
-    appView.style.display = 'none';
-    adminView.style.display = 'none';
-    loginView.style.display = 'flex';
+    cambiarVista('login');
     document.getElementById('pass').value = '';
-    btnLogin.innerText = "Ingresar";
-    btnAdminPanel.style.display = 'none';
+    document.getElementById('btn-login').innerText = "Ingresar";
 });
 
-// 6. ACTIVAR ENTORNO OPERATIVO
-function iniciarEntornoOperativo(esAdmin = false) {
-    loginView.style.display = 'none';
-    adminView.style.display = 'none';
-    appView.style.display = 'flex';
-    
-    if(esAdmin) btnAdminPanel.style.display = 'block';
+function cambiarVista(vistaDestino) {
+    Object.values(views).forEach(v => v.style.display = 'none');
+    views[vistaDestino].style.display = 'flex';
+    if(vistaDestino === 'app' && map) setTimeout(() => { map.invalidateSize(); }, 200);
+}
+
+function iniciarApp(esAdmin) {
+    cambiarVista('app');
+    if(esAdmin) document.getElementById('btn-admin-panel').style.display = 'block';
 
     if (!map) {
         map = L.map('mapa').setView([-34.898, -54.945], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: 'S.I.C.T.' }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
     }
-    setTimeout(() => { map.invalidateSize(); }, 200);
 }
 
-// 7. PANEL DE AUDITORÍA (SOLO SUPERUSUARIO)
-btnAdminPanel.addEventListener('click', async () => {
-    appView.style.display = 'none';
-    adminView.style.display = 'flex';
-    
-    const { data, error } = await db.from('logs_auditoria').select('*').order('fecha_hora', { ascending: false }).limit(50);
-    const tabla = document.getElementById('tabla-logs');
-    tabla.innerHTML = ''; 
-    
-    if(data) {
-        data.forEach(log => {
-            const fecha = new Date(log.fecha_hora).toLocaleString('es-UY');
-            let detalle = log.detalles?.documento_identidad ? `CI: ${log.detalles.documento_identidad}` : '-';
-            tabla.innerHTML += `
-                <tr>
-                    <td>${fecha}</td>
-                    <td style="font-weight:bold; color:var(--azul-ministerio);">${log.usuario_ci}</td>
-                    <td><span style="background:#e9ecef; padding:2px 5px; border-radius:3px;">${log.accion}</span></td>
-                    <td>${detalle}</td>
-                </tr>`;
-        });
-    }
-});
-
-btnCerrarAdmin.addEventListener('click', () => {
-    adminView.style.display = 'none';
-    appView.style.display = 'flex';
-    setTimeout(() => { map.invalidateSize(); }, 200);
-});
-
-// 8. RASTREO TÁCTICO: GPS A PADRÓN
-btnUbicar.addEventListener('click', () => {
+// 3. RASTREO TÁCTICO
+document.getElementById('btn-ubicar').addEventListener('click', () => {
+    const btn = document.getElementById('btn-ubicar');
     if ("geolocation" in navigator) {
-        btnUbicar.innerText = "Buscando...";
-        navigator.geolocation.getCurrentPosition(async (position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            
+        btn.innerText = "Satélites...";
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude, lon = pos.coords.longitude;
             if(marker) map.removeLayer(marker);
             marker = L.marker([lat, lon]).addTo(map);
             map.setView([lat, lon], 18);
 
-            const { data, error } = await db.rpc('padron_actual', { lon: lon, lat: lat });
-
+            const { data } = await db.rpc('padron_actual', { lon: lon, lat: lat });
             if (data && data.length > 0) {
-                resultadoPadron.innerText = `Padrón: ${data[0].numero_padron}`;
-                btnCensar.style.display = 'block';
+                padronUbicacionActual = data[0].numero_padron;
+                document.getElementById('resultado-padron').innerText = `Padrón: ${padronUbicacionActual}`;
+                document.getElementById('btn-censar').style.display = 'block';
             } else {
-                resultadoPadron.innerText = "Vía Pública";
+                padronUbicacionActual = "Vía Pública";
+                document.getElementById('resultado-padron').innerText = "Vía Pública";
+                document.getElementById('btn-censar').style.display = 'none';
             }
-            btnUbicar.innerText = "Actualizar GPS";
-        }, (error) => {
-            alert("Error GPS."); btnUbicar.innerText = "Detectar GPS";
-        }, { enableHighAccuracy: true });
+            btn.innerText = "Actualizar GPS";
+        }, () => { btn.innerText = "Error GPS"; }, { enableHighAccuracy: true });
     }
 });
 
-// 9. FORMULARIO DE CENSO (EMPAQUETADO DE INTELIGENCIA)
+// 4. GUARDAR CENSO
 const modalCenso = document.getElementById('modal-censo');
 document.getElementById('btn-censar').addEventListener('click', () => modalCenso.style.display = 'flex');
 document.getElementById('btn-cancelar-censo').addEventListener('click', () => modalCenso.style.display = 'none');
 
 document.getElementById('btn-guardar-censo').addEventListener('click', async () => {
-    const btnGuardar = document.getElementById('btn-guardar-censo');
-    btnGuardar.innerText = "Guardando...";
-    
-    // Captura Datos Personales
+    const btn = document.getElementById('btn-guardar-censo');
     const ci = document.getElementById('censo-ci').value;
-    const nombre = document.getElementById('censo-nombre').value;
-    const apellido = document.getElementById('censo-apellido').value;
-    const alias = document.getElementById('censo-alias').value;
-    const antecedentes = document.getElementById('censo-antecedentes').checked;
+    const nom = document.getElementById('censo-nombre').value;
+    const ape = document.getElementById('censo-apellido').value;
+    const ant = document.getElementById('censo-antecedentes').checked;
+    
+    if(!ci || !nom || !ape) { alert("Complete CI, Nombre y Apellido."); return; }
+    btn.innerText = "Guardando...";
 
-    if(!ci || !nombre || !apellido) {
-        alert("Cédula, Nombre y Apellido son obligatorios.");
-        btnGuardar.innerText = "Guardar Datos"; return;
-    }
+    const obs = `[VEHÍCULOS] ${document.getElementById('censo-vehiculos').value || 'Ninguno'} | [TENENCIA] ${document.getElementById('censo-tenencia').value}`;
 
-    // Captura y Empaquetado de Inteligencia y Social
-    const vehiculos = document.getElementById('censo-vehiculos').value || "Ninguno";
-    const camaras = document.getElementById('censo-camaras').checked ? "Sí" : "No";
-    const perros = document.getElementById('censo-perros').checked ? "Sí" : "No";
-    const armas = document.getElementById('censo-armas').checked ? "Sí" : "No";
-    const tenencia = document.getElementById('censo-tenencia').value;
-    const ute = document.getElementById('censo-ute').checked ? "Sí" : "No";
-    const ose = document.getElementById('censo-ose').checked ? "Sí" : "No";
-    const menores = document.getElementById('censo-menores').value;
-    const escuela = document.getElementById('censo-escolaridad').checked ? "Sí" : "No";
-    const discap = document.getElementById('censo-discapacidad').checked ? "Sí" : "No";
-
-    // Construimos un bloque de texto estructurado para guardar todo sin alterar la base de datos
-    const observaciones_completas = `
-    [INTELIGENCIA] Vehículos: ${vehiculos} | Cámaras: ${camaras} | Perros: ${perros} | Armas: ${armas}
-    [SOCIAL] Tenencia: ${tenencia} | UTE: ${ute} - OSE: ${ose} | Menores: ${menores} (Escolarizados: ${escuela}) | Discapacidad: ${discap}
-    `.trim();
-
-    // Enviar a Supabase
-    const { data, error } = await db.from('personas').insert([{
-        documento_identidad: ci, nombre: nombre, apellido: apellido, alias: alias,
-        tiene_antecedentes: antecedentes,
-        observaciones_seguridad: observaciones_completas
+    const { error } = await db.from('personas').insert([{
+        documento_identidad: ci, nombre: nom, apellido: ape, alias: document.getElementById('censo-alias').value,
+        tiene_antecedentes: ant, observaciones_seguridad: obs, padron_asociado: padronUbicacionActual
     }]);
 
-    if (error) {
-        alert(error.code === '23505' ? "Esta persona ya fue censada." : "Error: " + error.message);
-    } else {
-        alert("Habitante registrado con éxito.");
+    if (error) alert("Error: " + error.message);
+    else {
+        alert("Guardado.");
         modalCenso.style.display = 'none';
-        // Limpiar campos principales
-        document.getElementById('censo-ci').value = '';
-        document.getElementById('censo-nombre').value = '';
-        document.getElementById('censo-apellido').value = '';
-        document.getElementById('censo-vehiculos').value = '';
+        ['censo-ci','censo-nombre','censo-apellido','censo-vehiculos','censo-alias'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('censo-antecedentes').checked = false;
     }
-    btnGuardar.innerText = "Guardar Datos";
+    btn.innerText = "Guardar Datos";
 });
+
+// 5. MÓDULO DE BÚSQUEDA (INTELIGENCIA)
+document.getElementById('btn-abrir-buscar').addEventListener('click', () => cambiarVista('search'));
+document.getElementById('btn-cerrar-buscar').addEventListener('click', () => cambiarVista('app'));
+
+document.getElementById('btn-ejecutar-busqueda').addEventListener('click', async () => {
+    const tipo = document.getElementById('search-tipo').value;
+    const valor = document.getElementById('search-valor').value;
+    const contenedor = document.getElementById('contenedor-resultados');
+    
+    if(!valor) { contenedor.innerHTML = "<p style='color:red;'>Ingrese un valor para buscar.</p>"; return; }
+    
+    contenedor.innerHTML = "<p>Consultando base de datos...</p>";
+    
+    // Armar la consulta dinámicamente según lo que eligió el policía
+    let query = db.from('personas').select('*');
+    if(tipo === 'documento_identidad' || tipo === 'padron_asociado') {
+        query = query.eq(tipo, valor);
+    } else {
+        query = query.ilike(tipo, `%${valor}%`); // Búsqueda parcial para nombres/apellidos
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+        contenedor.innerHTML = `<p style="color:red;">Error de conexión.</p>`;
+    } else if (data.length === 0) {
+        contenedor.innerHTML = `<p>No se encontraron registros para esta búsqueda.</p>`;
+    } else {
+        contenedor.innerHTML = '';
+        data.forEach(p => {
+            const alertaHTML = p.tiene_antecedentes ? `<span style="color:#dc3545; font-weight:bold;">⚠️ POSEE ANTECEDENTES</span>` : `<span style="color:#28a745;">Sin anotaciones</span>`;
+            const claseFicha = p.tiene_antecedentes ? 'ficha-resultado alerta' : 'ficha-resultado';
+            
+            contenedor.innerHTML += `
+                <div class="${claseFicha}">
+                    <div class="ficha-ubicacion">📍 Padrón / Vivienda: ${p.padron_asociado || 'No registrado'}</div>
+                    <h4 class="ficha-nombre">${p.nombre} ${p.apellido} ${p.alias ? `alias "${p.alias}"` : ''}</h4>
+                    <p class="ficha-datos">C.I: ${p.documento_identidad} | Estado: ${alertaHTML}</p>
+                    <div class="ficha-obs">${p.observaciones_seguridad || 'Sin observaciones sociales o de inteligencia registradas.'}</div>
+                </div>
+            `;
+        });
+    }
+});
+
+// 6. PANEL DE ADMIN
+document.getElementById('btn-admin-panel').addEventListener('click', async () => {
+    cambiarVista('admin');
+    const { data } = await db.from('logs_auditoria').select('*').order('fecha_hora', { ascending: false }).limit(30);
+    const tabla = document.getElementById('tabla-logs');
+    tabla.innerHTML = ''; 
+    if(data) data.forEach(l => {
+        tabla.innerHTML += `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${new Date(l.fecha_hora).toLocaleDateString('es-UY')}</td>
+        <td style="border-bottom:1px solid #ddd; font-weight:bold;">${l.usuario_ci}</td>
+        <td style="border-bottom:1px solid #ddd; font-size:0.8rem;">${l.accion} en ${l.tabla_afectada}</td></tr>`;
+    });
+});
+document.getElementById('btn-cerrar-admin').addEventListener('click', () => cambiarVista('app'));
