@@ -1,6 +1,6 @@
 // 1. CONFIGURACIÓN
 const SUPABASE_URL = 'https://maalgmxakmikryrmhloz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbG... (PEGA_TU_CLAVE_ANON_AQUÍ)';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hYWxnbXhha21pa3J5cm1obG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzEzNTQsImV4cCI6MjA5NjE0NzM1NH0.Hdoh3Sct07fHVDb7YrEKe_zvryPXxLOvCMGLv-iseCs';
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
