@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no, viewport-fit=cover">
+    <title>Censo Operativo - Ministerio del Interior</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { box-sizing: border-box; }
+        
+        :root {
+            --azul-ministerio: #002855;
+            --blanco: #ffffff;
+            --gris-fondo: #f4f6f8;
+        }
+        body, html {
+            margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: var(--gris-fondo); height: 100%; overflow: hidden;
+        }
+
+        /* --- VISTA DE LOGIN ESTILO S.I.S.C.A. --- */
+        #login-view {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; background-color: var(--azul-ministerio);
+            background-image: url('85e8cbda-5ebd-498b-a249-46342c55988e.jpg');
+            background-size: cover; background-position: left center;
+        }
+        .login-box {
+            background: rgba(255, 255, 255, 0.95); padding: 2.5rem 2rem; border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3); width: 85%; max-width: 320px; text-align: center;
+        }
+        .login-box h2 { color: var(--azul-ministerio); margin: 0 0 5px 0; font-size: 1.4rem; }
+        .login-box p.subtitle { color: #666; font-size: 0.85rem; margin-bottom: 20px; font-weight: 500; }
+        .input-group { margin-bottom: 1.2rem; text-align: left; }
+        .input-group label { display: block; font-size: 0.8rem; color: #333; margin-bottom: 5px; font-weight: bold; }
+        .input-group input {
+            width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px;
+            font-size: 1rem;
+        }
+        .btn-ingresar {
+            background-color: var(--azul-ministerio); color: var(--blanco); border: none;
+            padding: 0.9rem; width: 100%; border-radius: 4px; font-size: 1rem;
+            cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .btn-ingresar:active { background-color: #001f44; }
+
+        /* --- VISTA PRINCIPAL DE LA APP --- */
+        #app-view { display: none; height: 100vh; flex-direction: column; }
+        
+        /* Banner superior */
+        .header {
+            background-color: var(--blanco); padding: 12px 15px; display: flex;
+            align-items: center; justify-content: space-between;
+            border-bottom: 5px solid var(--azul-ministerio); z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .header-title { font-weight: 800; color: var(--azul-ministerio); font-size: 1.1rem; text-transform: uppercase; }
+        .btn-salir { background: transparent; border: 1px solid var(--azul-ministerio); color: var(--azul-ministerio); padding: 5px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        
+        #mapa { flex: 1; width: 100%; z-index: 1; }
+        
+        /* Controles inferiores para el PCOP */
+        .panel-inferior {
+            background: var(--blanco); padding: 20px 15px; border-top: 1px solid #ddd;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000;
+        }
+        .info-padr { font-size: 1.2rem; font-weight: bold; margin-bottom: 12px; color: var(--azul-ministerio); }
+        .btn-ubicar {
+            background-color: var(--azul-ministerio); color: white; border: none; padding: 12px;
+            width: 100%; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer;
+        }
+        .btn-censar {
+            background-color: #28a745; color: white; border: none; padding: 12px;
+            width: 100%; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer;
+            margin-top: 10px; display: none; 
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-view">
+        <div class="login-box">
+            <h2>S.I.C.T.</h2> <p class="subtitle">PLAN MÁS BARRIO</p>
+            <div class="input-group">
+                <label for="doc">Usuario (Documento)</label>
+                <input type="email" id="doc" placeholder="Ej: 12345678@policia.uy">
+            </div>
+            <div class="input-group">
+                <label for="pass">Contraseña</label>
+                <input type="password" id="pass" placeholder="***">
+            </div>
+            <button class="btn-ingresar" id="btn-login">Ingresar</button>
+            <p id="login-error" style="color: #dc3545; font-size: 0.85rem; margin-top: 10px; display: none; font-weight: bold;">Credenciales inválidas.</p>
+        </div>
+    </div>
+
+    <div id="app-view">
+        <div class="header">
+            <div class="header-title">Censo | Los Caracoles</div>
+            <button class="btn-salir" id="btn-logout">Salir</button>
+        </div>
+        
+        <div id="mapa"></div>
+        
+        <div class="panel-inferior">
+            <div class="info-padr" id="resultado-padron">📍 Modo de Prueba Activo</div>
+            <button class="btn-ubicar" id="btn-ubicar">Detectar Padrón GPS</button>
+            <button class="btn-censar" id="btn-censar" style="display: block;">Iniciar Relevamiento</button>
+        </div>
+    </div>
+
+    <div id="modal-censo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,40,85,0.8); z-index: 2000; justify-content: center; align-items: center;">
+        <div style="background: white; width: 90%; max-width: 400px; border-radius: 8px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+            <h3 style="color: var(--azul-ministerio); margin-top: 0; border-bottom: 2px solid var(--azul-ministerio); padding-bottom: 10px;">Registro de Habitante</h3>
+            
+            <div class="input-group">
+                <label>Cédula de Identidad</label>
+                <input type="text" id="censo-ci" placeholder="Sin puntos ni guiones">
+            </div>
+            <div class="input-group">
+                <label>Nombre</label>
+                <input type="text" id="censo-nombre">
+            </div>
+            <div class="input-group">
+                <label>Apellido</label>
+                <input type="text" id="censo-apellido">
+            </div>
+            <div class="input-group">
+                <label>Alias / Apodo (Opcional)</label>
+                <input type="text" id="censo-alias">
+            </div>
+            <div class="input-group" style="display: flex; align-items: center; margin-top: 15px;">
+                <input type="checkbox" id="censo-antecedentes" style="width: auto; margin-right: 10px; transform: scale(1.5);">
+                <label style="margin: 0; color: #dc3545; font-weight: bold;">Posee Antecedentes Penales</label>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 25px;">
+                <button id="btn-cancelar-censo" style="flex: 1; padding: 10px; background: #6c757d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Cancelar</button>
+                <button id="btn-guardar-censo" style="flex: 1; padding: 10px; background: var(--azul-ministerio); color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+</body>
+</html>
