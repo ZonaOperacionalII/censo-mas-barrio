@@ -1,6 +1,6 @@
 // 1. CONFIGURACIÓN
 const SUPABASE_URL = 'https://maalgmxakmikryrmhloz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hYWxnbXhha21pa3J5cm1obG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NzEzNTQsImV4cCI6MjA5NjE0NzM1NH0.Hdoh3Sct07fHVDb7YrEKe_zvryPXxLOvCMGLv-iseCs';
+const SUPABASE_ANON_KEY = 'eyJhbG... (PEGA_TU_CLAVE_ANON_AQUÍ)';
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -12,7 +12,7 @@ const views = {
 };
 
 let map, marker;
-let padronUbicacionActual = "Desconocido"; // Guardará el padrón donde está parado el policía
+let padronUbicacionActual = "Desconocido";
 
 // 2. SEGURIDAD Y ROLES
 async function checkSession() {
@@ -55,6 +55,27 @@ function cambiarVista(vistaDestino) {
     if(vistaDestino === 'app' && map) setTimeout(() => { map.invalidateSize(); }, 200);
 }
 
+// 3. MOTOR DE UBICACIÓN Y MAPA (GPS + MODO MANUAL)
+async function procesarUbicacion(lat, lon) {
+    if(marker) map.removeLayer(marker);
+    marker = L.marker([lat, lon]).addTo(map);
+    
+    document.getElementById('resultado-padron').innerText = "📍 Analizando sector...";
+    document.getElementById('btn-censar').style.display = 'none';
+
+    // Cruzar coordenada con base de datos (con el radio táctico de 15m)
+    const { data } = await db.rpc('padron_actual', { lon: lon, lat: lat });
+    
+    if (data && data.length > 0) {
+        padronUbicacionActual = data[0].numero_padron;
+        document.getElementById('resultado-padron').innerText = `Padrón / Vivienda: ${padronUbicacionActual}`;
+        document.getElementById('btn-censar').style.display = 'block'; // Mostrar botón
+    } else {
+        padronUbicacionActual = "Vía Pública";
+        document.getElementById('resultado-padron').innerText = "Vía Pública / Toca una vivienda";
+    }
+}
+
 function iniciarApp(esAdmin) {
     cambiarVista('app');
     if(esAdmin) document.getElementById('btn-admin-panel').style.display = 'block';
@@ -62,31 +83,25 @@ function iniciarApp(esAdmin) {
     if (!map) {
         map = L.map('mapa').setView([-34.898, -54.945], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        
+        // MODO MANUAL: Permite tocar el mapa para ubicar un padrón
+        map.on('click', async (e) => {
+            await procesarUbicacion(e.latlng.lat, e.latlng.lng);
+        });
     }
+    
+    document.getElementById('resultado-padron').innerText = "Usa el GPS o toca una casa en el mapa";
 }
 
-// 3. RASTREO TÁCTICO
 document.getElementById('btn-ubicar').addEventListener('click', () => {
     const btn = document.getElementById('btn-ubicar');
     if ("geolocation" in navigator) {
         btn.innerText = "Satélites...";
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const lat = pos.coords.latitude, lon = pos.coords.longitude;
-            if(marker) map.removeLayer(marker);
-            marker = L.marker([lat, lon]).addTo(map);
             map.setView([lat, lon], 18);
-
-            const { data } = await db.rpc('padron_actual', { lon: lon, lat: lat });
-            if (data && data.length > 0) {
-                padronUbicacionActual = data[0].numero_padron;
-                document.getElementById('resultado-padron').innerText = `Padrón: ${padronUbicacionActual}`;
-                document.getElementById('btn-censar').style.display = 'block';
-            } else {
-                padronUbicacionActual = "Vía Pública";
-                document.getElementById('resultado-padron').innerText = "Vía Pública";
-                document.getElementById('btn-censar').style.display = 'none';
-            }
-            btn.innerText = "Actualizar GPS";
+            await procesarUbicacion(lat, lon);
+            btn.innerText = "Ubicar Posición GPS";
         }, () => { btn.innerText = "Error GPS"; }, { enableHighAccuracy: true });
     }
 });
@@ -136,12 +151,11 @@ document.getElementById('btn-ejecutar-busqueda').addEventListener('click', async
     
     contenedor.innerHTML = "<p>Consultando base de datos...</p>";
     
-    // Armar la consulta dinámicamente según lo que eligió el policía
     let query = db.from('personas').select('*');
     if(tipo === 'documento_identidad' || tipo === 'padron_asociado') {
         query = query.eq(tipo, valor);
     } else {
-        query = query.ilike(tipo, `%${valor}%`); // Búsqueda parcial para nombres/apellidos
+        query = query.ilike(tipo, `%${valor}%`);
     }
 
     const { data, error } = await query;
