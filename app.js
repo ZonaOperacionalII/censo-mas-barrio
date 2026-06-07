@@ -55,26 +55,51 @@ function cambiarVista(vistaDestino) {
     if(vistaDestino === 'app' && map) setTimeout(() => { map.invalidateSize(); }, 200);
 }
 
-// 3. MOTOR DE UBICACIÓN Y MAPA (GPS + MODO MANUAL)
+// 3. MOTOR DE UBICACIÓN Y MAPA (GPS + MODO MANUAL + ALTA PROVISORIA)
+let ultimaLat = null;
+let ultimaLon = null;
+
 async function procesarUbicacion(lat, lon) {
+    ultimaLat = lat;
+    ultimaLon = lon;
     if(marker) map.removeLayer(marker);
     marker = L.marker([lat, lon]).addTo(map);
     
     document.getElementById('resultado-padron').innerText = "📍 Analizando sector...";
     document.getElementById('btn-censar').style.display = 'none';
+    document.getElementById('btn-crear-padron').style.display = 'none';
 
-    // Cruzar coordenada con base de datos (con el radio táctico de 15m)
     const { data } = await db.rpc('padron_actual', { lon: lon, lat: lat });
     
     if (data && data.length > 0) {
         padronUbicacionActual = data[0].numero_padron;
         document.getElementById('resultado-padron').innerText = `Padrón / Vivienda: ${padronUbicacionActual}`;
-        document.getElementById('btn-censar').style.display = 'block'; // Mostrar botón
+        document.getElementById('btn-censar').style.display = 'block';
     } else {
         padronUbicacionActual = "Vía Pública";
-        document.getElementById('resultado-padron').innerText = "Vía Pública / Toca una vivienda";
+        document.getElementById('resultado-padron').innerText = "Vía Pública / Fuera de cartografía";
+        document.getElementById('btn-crear-padron').style.display = 'block'; // Mostrar opción de emergencia
     }
 }
+
+// Lógica del botón Crear Padrón Provisorio
+document.getElementById('btn-crear-padron').addEventListener('click', () => {
+    const idProvisorio = 'PROV-' + Math.floor(Math.random() * 1000000);
+    padronUbicacionActual = idProvisorio;
+    
+    // Cambiar marcador a rojo para alerta visual
+    if(marker) map.removeLayer(marker);
+    const redIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+    marker = L.marker([ultimaLat, ultimaLon], {icon: redIcon}).addTo(map);
+    
+    document.getElementById('resultado-padron').innerText = `Alta Táctica: ${idProvisorio}`;
+    document.getElementById('btn-crear-padron').style.display = 'none';
+    document.getElementById('btn-censar').style.display = 'block';
+});
 
 function iniciarApp(esAdmin) {
     cambiarVista('app');
@@ -84,13 +109,11 @@ function iniciarApp(esAdmin) {
         map = L.map('mapa').setView([-34.898, -54.945], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
         
-        // MODO MANUAL: Permite tocar el mapa para ubicar un padrón
         map.on('click', async (e) => {
             await procesarUbicacion(e.latlng.lat, e.latlng.lng);
         });
     }
-    
-    document.getElementById('resultado-padron').innerText = "Usa el GPS o toca una casa en el mapa";
+    document.getElementById('resultado-padron').innerText = "Usa el GPS o toca el mapa";
 }
 
 document.getElementById('btn-ubicar').addEventListener('click', () => {
@@ -121,7 +144,12 @@ document.getElementById('btn-guardar-censo').addEventListener('click', async () 
     if(!ci || !nom || !ape) { alert("Complete CI, Nombre y Apellido."); return; }
     btn.innerText = "Guardando...";
 
-    const obs = `[VEHÍCULOS] ${document.getElementById('censo-vehiculos').value || 'Ninguno'} | [TENENCIA] ${document.getElementById('censo-tenencia').value}`;
+    let obs = `[VEHÍCULOS] ${document.getElementById('censo-vehiculos').value || 'Ninguno'} | [TENENCIA] ${document.getElementById('censo-tenencia').value}`;
+    
+    // Si el padrón es provisorio, inyectamos las coordenadas exactas en la ficha de inteligencia
+    if (padronUbicacionActual.startsWith('PROV-')) {
+        obs += ` | [GPS TÁCTICO] Lat: ${ultimaLat}, Lon: ${ultimaLon}`;
+    }
 
     const { error } = await db.from('personas').insert([{
         documento_identidad: ci, nombre: nom, apellido: ape, alias: document.getElementById('censo-alias').value,
