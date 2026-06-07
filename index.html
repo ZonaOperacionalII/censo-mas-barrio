@@ -9,10 +9,12 @@
     <style>
         * { box-sizing: border-box; }
         :root { --azul-ministerio: #002855; --blanco: #ffffff; --gris-fondo: #f4f6f8; }
-        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--gris-fondo); height: 100%; overflow: hidden; }
+        
+        /* CORRECCIÓN: Permitimos scroll en el body y html */
+        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--gris-fondo); min-height: 100%; overflow: auto; }
 
         /* VISTAS */
-        #login-view { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: var(--azul-ministerio); background-image: url('85e8cbda-5ebd-498b-a249-46342c55988e.jpg'); background-size: cover; background-position: left center; }
+        #login-view { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: var(--azul-ministerio); background-image: url('85e8cbda-5ebd-498b-a249-46342c55988e.jpg'); background-size: cover; background-position: left center; }
         .login-box { background: rgba(255, 255, 255, 0.95); padding: 2.5rem 2rem; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); width: 85%; max-width: 320px; text-align: center; }
         .login-box h2 { color: var(--azul-ministerio); margin: 0 0 5px 0; font-size: 1.4rem; }
         .input-group { margin-bottom: 1.2rem; text-align: left; }
@@ -20,10 +22,14 @@
         .input-group input, .input-group select { width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
         .btn-primario { background-color: var(--azul-ministerio); color: var(--blanco); border: none; padding: 0.9rem; width: 100%; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer; text-transform: uppercase; }
 
-        #app-view, #admin-view, #search-view { display: none; height: 100vh; flex-direction: column; }
-        .header { background-color: var(--blanco); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 5px solid var(--azul-ministerio); z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        /* CORRECCIÓN: Contenedores con altura mínima para permitir scroll */
+        #app-view, #admin-view, #search-view { display: none; min-height: 100vh; flex-direction: column; }
+        
+        .header { background-color: var(--blanco); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 5px solid var(--azul-ministerio); position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .header-title { font-weight: 800; color: var(--azul-ministerio); font-size: 0.75rem; text-transform: uppercase; line-height: 1.1; max-width: 50%; }
-        #mapa { flex: 1; width: 100%; z-index: 1; }
+        
+        /* CORRECCIÓN: Mapa con altura fija para dejar espacio a los botones */
+        #mapa { height: 60vh; width: 100%; z-index: 1; }
         
         .panel-inferior { background: var(--blanco); padding: 15px; border-top: 1px solid #ddd; z-index: 1000; }
         .info-padr { font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: var(--azul-ministerio); }
@@ -48,7 +54,6 @@
 
     <div id="login-view">
         <div class="login-box">
-            <!-- Logo Login -->
             <img src="logo_vigia.png" alt="V.I.G.I.A." style="width: 80px; display: block; margin: 0 auto 10px;">
             <h2>V.I.G.I.A.</h2> 
             <p style="margin-top:0; font-weight:bold; color:#555;">ZONA OPERACIONAL II</p>
@@ -79,6 +84,7 @@
             <button class="btn-primario" id="btn-censar" style="background: #28a745; display: none;">Iniciar Relevamiento</button>
         </div>
     </div>
+
     <div id="search-view" style="background: var(--gris-fondo); padding: 20px; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="color: var(--azul-ministerio); margin: 0;">Búsqueda Territorial</h2>
