@@ -130,12 +130,14 @@ document.getElementById('btn-ubicar').addEventListener('click', () => {
 });
 
 // 4. GUARDAR CENSO
-const modalCenso = document.getElementById('modal-censo');
-document.getElementById('btn-censar').addEventListener('click', () => modalCenso.style.display = 'flex');
-document.getElementById('btn-cancelar-censo').addEventListener('click', () => modalCenso.style.display = 'none');
-
 document.getElementById('btn-guardar-censo').addEventListener('click', async () => {
     const btn = document.getElementById('btn-guardar-censo');
+    // Nuevos campos
+    const padronMan = document.getElementById('censo-padron-manual').value;
+    const man = document.getElementById('censo-manzana').value;
+    const viv = document.getElementById('censo-vivienda').value;
+    
+    // Datos existentes
     const ci = document.getElementById('censo-ci').value;
     const nom = document.getElementById('censo-nombre').value;
     const ape = document.getElementById('censo-apellido').value;
@@ -144,66 +146,61 @@ document.getElementById('btn-guardar-censo').addEventListener('click', async () 
     if(!ci || !nom || !ape) { alert("Complete CI, Nombre y Apellido."); return; }
     btn.innerText = "Guardando...";
 
-    let obs = `[VEHÍCULOS] ${document.getElementById('censo-vehiculos').value || 'Ninguno'} | [TENENCIA] ${document.getElementById('censo-tenencia').value}`;
+    let obs = `[LOC] Padrón: ${padronMan || '-'} | Manzana: ${man || '-'} | Vivienda: ${viv || '-'} | [VEHÍCULOS] ${document.getElementById('censo-vehiculos').value || 'Ninguno'} | [TENENCIA] ${document.getElementById('censo-tenencia').value}`;
     
-    // Si el padrón es provisorio, inyectamos las coordenadas exactas en la ficha de inteligencia
     if (padronUbicacionActual.startsWith('PROV-')) {
         obs += ` | [GPS TÁCTICO] Lat: ${ultimaLat}, Lon: ${ultimaLon}`;
     }
 
     const { error } = await db.from('personas').insert([{
         documento_identidad: ci, nombre: nom, apellido: ape, alias: document.getElementById('censo-alias').value,
-        tiene_antecedentes: ant, observaciones_seguridad: obs, padron_asociado: padronUbicacionActual
+        tiene_antecedentes: ant, observaciones_seguridad: obs, padron_asociado: (padronMan || padronUbicacionActual)
     }]);
 
     if (error) alert("Error: " + error.message);
     else {
-        alert("Guardado.");
+        alert("Guardado exitosamente.");
         modalCenso.style.display = 'none';
-        ['censo-ci','censo-nombre','censo-apellido','censo-vehiculos','censo-alias'].forEach(id => document.getElementById(id).value = '');
+        // Limpiar formulario
+        ['censo-ci','censo-nombre','censo-apellido','censo-vehiculos','censo-alias','censo-padron-manual','censo-manzana','censo-vivienda'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('censo-antecedentes').checked = false;
     }
     btn.innerText = "Guardar Datos";
 });
 
-// 5. MÓDULO DE BÚSQUEDA (INTELIGENCIA)
-document.getElementById('btn-abrir-buscar').addEventListener('click', () => cambiarVista('search'));
-document.getElementById('btn-cerrar-buscar').addEventListener('click', () => cambiarVista('app'));
+// 5. MÓDULO DE BÚSQUEDA MEJORADO
+async function obtenerDireccion(lat, lon) {
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
+        const data = await res.json();
+        return data.display_name || "Dirección no encontrada";
+    } catch { return "Error geocodificando"; }
+}
 
 document.getElementById('btn-ejecutar-busqueda').addEventListener('click', async () => {
     const tipo = document.getElementById('search-tipo').value;
     const valor = document.getElementById('search-valor').value;
     const contenedor = document.getElementById('contenedor-resultados');
     
-    if(!valor) { contenedor.innerHTML = "<p style='color:red;'>Ingrese un valor para buscar.</p>"; return; }
+    if(!valor) { contenedor.innerHTML = "<p style='color:red;'>Ingrese un valor.</p>"; return; }
+    contenedor.innerHTML = "<p>Consultando base...</p>";
     
-    contenedor.innerHTML = "<p>Consultando base de datos...</p>";
-    
-    let query = db.from('personas').select('*');
-    if(tipo === 'documento_identidad' || tipo === 'padron_asociado') {
-        query = query.eq(tipo, valor);
-    } else {
-        query = query.ilike(tipo, `%${valor}%`);
-    }
+    const { data, error } = await db.from('personas').select('*').ilike(tipo, `%${valor}%`);
 
-    const { data, error } = await query;
-
-    if (error) {
-        contenedor.innerHTML = `<p style="color:red;">Error de conexión.</p>`;
-    } else if (data.length === 0) {
-        contenedor.innerHTML = `<p>No se encontraron registros para esta búsqueda.</p>`;
-    } else {
+    if (error) contenedor.innerHTML = `<p style="color:red;">Error de conexión.</p>`;
+    else if (data.length === 0) contenedor.innerHTML = `<p>No se encontraron registros.</p>`;
+    else {
         contenedor.innerHTML = '';
         data.forEach(p => {
-            const alertaHTML = p.tiene_antecedentes ? `<span style="color:#dc3545; font-weight:bold;">⚠️ POSEE ANTECEDENTES</span>` : `<span style="color:#28a745;">Sin anotaciones</span>`;
-            const claseFicha = p.tiene_antecedentes ? 'ficha-resultado alerta' : 'ficha-resultado';
+            const alertaHTML = p.tiene_antecedentes ? `<span style="color:#dc3545; font-weight:bold;">⚠️ ANTECEDENTES</span>` : `<span style="color:#28a745;">Limpio</span>`;
             
             contenedor.innerHTML += `
-                <div class="${claseFicha}">
-                    <div class="ficha-ubicacion">📍 Padrón / Vivienda: ${p.padron_asociado || 'No registrado'}</div>
-                    <h4 class="ficha-nombre">${p.nombre} ${p.apellido} ${p.alias ? `alias "${p.alias}"` : ''}</h4>
+                <div class="ficha-resultado">
+                    <div class="ficha-ubicacion">📍 ${p.padron_asociado}</div>
+                    <h4 class="ficha-nombre">${p.nombre} ${p.apellido}</h4>
                     <p class="ficha-datos">C.I: ${p.documento_identidad} | Estado: ${alertaHTML}</p>
-                    <div class="ficha-obs">${p.observaciones_seguridad || 'Sin observaciones sociales o de inteligencia registradas.'}</div>
+                    <div class="ficha-obs">${p.observaciones_seguridad}</div>
+                    <button class="btn-primario" style="margin-top:10px; padding:5px; font-size:0.8rem;" onclick="alert('Funcionalidad de mapa vinculada a: ${p.padron_asociado}')">Ver en Mapa</button>
                 </div>
             `;
         });
