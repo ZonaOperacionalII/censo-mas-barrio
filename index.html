@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no, viewport-fit=cover">
-    <title>V.I.G.I.A. - Vigilancia e Inteligencia para Gestión e Intervención en el Área</title>
+    <title>V.I.G.I.A. - Control Territorial</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
@@ -16,9 +16,9 @@
         #login-view { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: var(--azul-ministerio); background-image: url('85e8cbda-5ebd-498b-a249-46342c55988e.jpg'); background-size: cover; background-position: left center; }
         .login-box { background: rgba(255, 255, 255, 0.95); padding: 2.5rem 2rem; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); width: 85%; max-width: 320px; text-align: center; }
         .login-box h2 { color: var(--azul-ministerio); margin: 0 0 5px 0; font-size: 1.4rem; }
-        .input-group { margin-bottom: 1.2rem; text-align: left; }
+        .input-group { margin-bottom: 1.0rem; text-align: left; }
         .input-group label { display: block; font-size: 0.8rem; color: #333; margin-bottom: 5px; font-weight: bold; }
-        .input-group input, .input-group select { width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 0.7rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; font-family: inherit; }
         .btn-primario { background-color: var(--azul-ministerio); color: var(--blanco); border: none; padding: 0.9rem; width: 100%; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer; text-transform: uppercase; }
 
         #app-view, #admin-view, #search-view { display: none; min-height: 100vh; flex-direction: column; }
@@ -26,7 +26,10 @@
         .header { background-color: var(--blanco); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 5px solid var(--azul-ministerio); position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .header-title { font-weight: 800; color: var(--azul-ministerio); font-size: 0.75rem; text-transform: uppercase; line-height: 1.1; max-width: 50%; }
         
-        #mapa { height: 60vh; width: 100%; z-index: 1; }
+        /* BLOQUE DE USUARIO Y ROL */
+        #user-info-badge { font-size: 0.7rem; background: #e9ecef; color: var(--azul-ministerio); padding: 4px 8px; border-radius: 4px; font-weight: bold; text-align: right; line-height: 1.2; margin-right: 5px;}
+        
+        #mapa { height: 55vh; width: 100%; z-index: 1; }
         
         .panel-inferior { background: var(--blanco); padding: 15px; border-top: 1px solid #ddd; z-index: 1000; }
         .info-padr { font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: var(--azul-ministerio); }
@@ -38,13 +41,17 @@
         .ficha-nombre { font-size: 1.2rem; font-weight: bold; margin: 0 0 5px 0; }
         .ficha-datos { font-size: 0.9rem; color: #555; margin: 0 0 10px 0; }
         .ficha-ubicacion { font-weight: bold; background: #e9ecef; display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 0.85rem; margin-bottom: 10px; }
-        .ficha-obs { font-size: 0.85rem; color: #333; white-space: pre-wrap; }
+        .ficha-obs { font-size: 0.85rem; color: #333; white-space: pre-wrap; margin-bottom: 10px; }
 
-        /* MODAL */
-        .modal-container { background: white; width: 95%; max-width: 450px; border-radius: 8px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; }
-        .seccion-titulo { background: #e9ecef; padding: 5px 10px; font-size: 0.85rem; font-weight: bold; color: var(--azul-ministerio); margin: 15px 0 10px 0; border-left: 4px solid var(--azul-ministerio); }
-        .check-group { display: flex; align-items: center; margin-bottom: 10px; }
-        .check-group input { transform: scale(1.3); margin-right: 10px; }
+        /* MODAL CENSO RÁPIDO */
+        .modal-container { background: white; width: 95%; max-width: 450px; border-radius: 8px; padding: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; margin: 20px auto; }
+        .seccion-titulo { background: var(--azul-ministerio); padding: 6px 10px; font-size: 0.8rem; font-weight: bold; color: white; margin: 15px 0 10px 0; border-radius: 4px; }
+        
+        /* CHECKBOX TIPO SWITCH TÁCTICO */
+        .tactical-checks { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+        .tactical-checks label { background: #e9ecef; padding: 8px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 5px; color: #333; flex: 1; min-width: 45%; justify-content: center;}
+        .tactical-checks input[type="checkbox"] { transform: scale(1.3); }
+        
     </style>
 </head>
 <body>
@@ -63,13 +70,17 @@
 
     <div id="app-view">
         <div class="header">
-            <div style="display: flex; align-items: center;">
-                <img src="logo_vigia.png" alt="Logo" style="height: 35px; margin-right: 10px;">
-                <div class="header-title">Vigilancia e Inteligencia para Gestión e Intervención en el Área</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="logo_vigia.png" alt="Logo" style="height: 35px;">
+                <div class="header-title">V.I.G.I.A.</div>
             </div>
-            <div style="display: flex; gap: 5px;">
-                <button id="btn-abrir-buscar" class="btn-accion" style="background: var(--azul-ministerio); color: white;">🔍</button>
-                <button id="btn-admin-panel" class="btn-accion" style="display: none; background: #ffc107; color: #000; border: none;">Admin</button>
+            <div style="display: flex; align-items: center;">
+                <div id="user-info-badge">
+                    <span id="ui-nombre">Cargando...</span><br>
+                    <span id="ui-rol" style="font-weight:normal; font-size:0.65rem;">Conectando</span>
+                </div>
+                <button id="btn-abrir-buscar" class="btn-accion" style="background: var(--azul-ministerio); color: white; margin-right: 5px;">🔍</button>
+                <button id="btn-admin-panel" class="btn-accion" style="display: none; background: #ffc107; color: #000; border: none; margin-right: 5px;">Admin</button>
                 <button id="btn-logout" class="btn-accion">Salir</button>
             </div>
         </div>
@@ -78,36 +89,33 @@
             <div class="info-padr" id="resultado-padron">📍 Detectando espacio o vivienda...</div>
             <button class="btn-primario" id="btn-ubicar" style="margin-bottom: 10px;">Ubicar Posición GPS</button>
             <button class="btn-primario" id="btn-crear-padron" style="background: #ffc107; color: #000; display: none; margin-bottom: 10px;">Crear Padrón Provisorio</button>
-            <button class="btn-primario" id="btn-censar" style="background: #28a745; display: none;">Iniciar Relevamiento</button>
+            <button class="btn-primario" id="btn-censar" style="background: #28a745; display: none;">📝 Iniciar Relevamiento</button>
         </div>
     </div>
 
+    <!-- VISTA BÚSQUEDA -->
     <div id="search-view" style="background: var(--gris-fondo); padding: 20px; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="color: var(--azul-ministerio); margin: 0;">Búsqueda Territorial</h2>
-            <button id="btn-cerrar-buscar" class="btn-accion">Volver al Mapa</button>
+            <button id="btn-cerrar-buscar" class="btn-accion">Volver</button>
         </div>
         <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px;">
             <div class="input-group">
-                <label>Criterio de Búsqueda</label>
                 <select id="search-tipo">
-                    <option value="padron_asociado">Número de Padrón / Vivienda</option>
                     <option value="documento_identidad">Cédula de Identidad</option>
+                    <option value="padron_asociado">Número de Padrón / Vivienda</option>
                     <option value="apellido">Apellido</option>
-                    <option value="nombre">Nombre</option>
                 </select>
             </div>
             <div class="input-group">
-                <label>Valor a buscar</label>
                 <input type="text" id="search-valor" placeholder="Ingrese el dato aquí...">
             </div>
             <button id="btn-ejecutar-busqueda" class="btn-primario">Consultar Base</button>
         </div>
-        <div id="contenedor-resultados">
-            <p style="text-align: center; color: #666;">Los resultados del sistema aparecerán aquí.</p>
-        </div>
+        <div id="contenedor-resultados"></div>
     </div>
 
+    <!-- VISTA ADMIN -->
     <div id="admin-view" style="padding: 20px; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="color: var(--azul-ministerio); margin: 0;">Log Operativo</h2>
@@ -119,38 +127,63 @@
         </table>
     </div>
 
-    <div id="modal-censo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,40,85,0.9); z-index: 2000; justify-content: center; align-items: center;">
+    <!-- MODAL DE CENSO TÁCTICO (NUEVO DISEÑO RÁPIDO) -->
+    <div id="modal-censo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,40,85,0.9); z-index: 2000; justify-content: center; align-items: flex-start; overflow-y: auto;">
         <div class="modal-container">
-            <h3 style="color: var(--azul-ministerio); margin-top: 0; text-align: center;">Censo Habitacional</h3>
+            <h3 style="color: var(--azul-ministerio); margin-top: 0; text-align: center; border-bottom: 2px solid #ddd; padding-bottom: 10px;">Relevamiento Territorial</h3>
             
-            <div class="seccion-titulo">UBICACIÓN (MANUAL)</div>
+            <div class="seccion-titulo">1. TITULAR Y UBICACIÓN</div>
             <div style="display: flex; gap: 5px;">
                 <div class="input-group" style="flex: 1;"><input type="text" id="censo-padron-manual" placeholder="Padrón"></div>
                 <div class="input-group" style="flex: 1;"><input type="text" id="censo-manzana" placeholder="Manzana"></div>
                 <div class="input-group" style="flex: 1;"><input type="text" id="censo-vivienda" placeholder="N° Viv."></div>
             </div>
-
-            <div class="seccion-titulo">DATOS PERSONALES</div>
-            <div class="input-group"><input type="text" id="censo-ci" placeholder="Cédula"></div>
-            <div style="display: flex; gap: 10px;">
+            <div class="input-group"><input type="number" id="censo-ci" placeholder="Cédula Titular (Sin guiones)"></div>
+            <div style="display: flex; gap: 5px;">
                 <div class="input-group" style="flex: 1;"><input type="text" id="censo-nombre" placeholder="Nombre"></div>
                 <div class="input-group" style="flex: 1;"><input type="text" id="censo-apellido" placeholder="Apellido"></div>
             </div>
-            <div class="input-group"><input type="text" id="censo-alias" placeholder="Alias"></div>
 
-            <div class="seccion-titulo">INTELIGENCIA POLICIAL</div>
-            <div class="check-group"><input type="checkbox" id="censo-antecedentes"> <label style="color: #dc3545;">Posee Antecedentes</label></div>
-            <div class="input-group"><input type="text" id="censo-vehiculos" placeholder="Vehículos asociados"></div>
+            <div class="seccion-titulo">2. INTELIGENCIA Y PLAN MÁS BARRIO</div>
+            <div class="tactical-checks">
+                <label style="border-left: 4px solid #dc3545;"><input type="checkbox" id="censo-antecedentes"> Antecedentes P.N.</label>
+                <label style="border-left: 4px solid #ffc107;"><input type="checkbox" id="pmb-calle-rota"> Calle Intransitable</label>
+                <label style="border-left: 4px solid #17a2b8;"><input type="checkbox" id="pmb-sin-luz"> Falta Alumbrado Púb.</label>
+                <label style="border-left: 4px solid #6c757d;"><input type="checkbox" id="pmb-basural"> Basural / Obstrucción</label>
+            </div>
+            <div class="input-group"><input type="text" id="censo-vehiculos" placeholder="Matrículas / Vehículos observados"></div>
 
-            <div class="seccion-titulo">RELEVAMIENTO SOCIAL</div>
+            <div class="seccion-titulo">3. SERVICIOS Y TENENCIA</div>
+            <div class="tactical-checks">
+                <label><input type="checkbox" id="srv-luz"> Energía (UTE)</label>
+                <label><input type="checkbox" id="srv-agua"> Agua (OSE)</label>
+                <label><input type="checkbox" id="srv-internet"> Internet</label>
+            </div>
             <div class="input-group">
                 <select id="censo-tenencia">
-                    <option value="No especifica">Situación de Tenencia...</option><option value="Propietario">Propietario</option><option value="Inquilino">Inquilino</option><option value="Ocupante">Ocupante</option>
+                    <option value="No especifica">Situación de Tenencia...</option><option value="Propietario">Propietario</option><option value="Inquilino">Inquilino</option><option value="Ocupante">Ocupante irregular</option>
                 </select>
             </div>
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
+
+            <div class="seccion-titulo">4. NÚCLEO FAMILIAR</div>
+            <div style="display: flex; gap: 5px;">
+                <div class="input-group" style="flex: 1;">
+                    <select id="censo-menores">
+                        <option value="0">Sin menores (3 a 17a)</option><option value="1">1 menor</option><option value="2">2 menores</option><option value="3+">3 o más menores</option>
+                    </select>
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label style="font-size:0.75rem; display:flex; align-items:center; gap:5px; height: 100%; margin:0;"><input type="checkbox" id="censo-escolarizados" checked> ¿Asisten a centro educativo?</label>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Otros ocupantes (Nombre, Relación, Edad, CI - Opcional)</label>
+                <textarea id="censo-familiares" rows="3" placeholder="Ej: Maria (Esposa, 35a), Juan (Hermano, 40a, CI: 1234567)"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px; padding-bottom: 20px;">
                 <button id="btn-cancelar-censo" class="btn-primario" style="background: #6c757d;">Cancelar</button>
-                <button id="btn-guardar-censo" class="btn-primario">Guardar Datos</button>
+                <button id="btn-guardar-censo" class="btn-primario" style="background: #28a745;">💾 GUARDAR FICHA</button>
             </div>
         </div>
     </div>
