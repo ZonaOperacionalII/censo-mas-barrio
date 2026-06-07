@@ -10,7 +10,6 @@
         * { box-sizing: border-box; }
         :root { --azul-ministerio: #002855; --blanco: #ffffff; --gris-fondo: #f4f6f8; }
         
-        /* CORRECCIÓN: Permitimos scroll en el body y html */
         body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--gris-fondo); min-height: 100%; overflow: auto; }
 
         /* VISTAS */
@@ -22,13 +21,11 @@
         .input-group input, .input-group select { width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
         .btn-primario { background-color: var(--azul-ministerio); color: var(--blanco); border: none; padding: 0.9rem; width: 100%; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer; text-transform: uppercase; }
 
-        /* CORRECCIÓN: Contenedores con altura mínima para permitir scroll */
         #app-view, #admin-view, #search-view { display: none; min-height: 100vh; flex-direction: column; }
         
         .header { background-color: var(--blanco); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 5px solid var(--azul-ministerio); position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .header-title { font-weight: 800; color: var(--azul-ministerio); font-size: 0.75rem; text-transform: uppercase; line-height: 1.1; max-width: 50%; }
         
-        /* CORRECCIÓN: Mapa con altura fija para dejar espacio a los botones */
         #mapa { height: 60vh; width: 100%; z-index: 1; }
         
         .panel-inferior { background: var(--blanco); padding: 15px; border-top: 1px solid #ddd; z-index: 1000; }
@@ -125,6 +122,14 @@
     <div id="modal-censo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,40,85,0.9); z-index: 2000; justify-content: center; align-items: center;">
         <div class="modal-container">
             <h3 style="color: var(--azul-ministerio); margin-top: 0; text-align: center;">Censo Habitacional</h3>
+            
+            <div class="seccion-titulo">UBICACIÓN (MANUAL)</div>
+            <div style="display: flex; gap: 5px;">
+                <div class="input-group" style="flex: 1;"><input type="text" id="censo-padron-manual" placeholder="Padrón"></div>
+                <div class="input-group" style="flex: 1;"><input type="text" id="censo-manzana" placeholder="Manzana"></div>
+                <div class="input-group" style="flex: 1;"><input type="text" id="censo-vivienda" placeholder="N° Viv."></div>
+            </div>
+
             <div class="seccion-titulo">DATOS PERSONALES</div>
             <div class="input-group"><input type="text" id="censo-ci" placeholder="Cédula"></div>
             <div style="display: flex; gap: 10px;">
