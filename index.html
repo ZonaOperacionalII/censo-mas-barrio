@@ -45,12 +45,11 @@
 
         /* MODAL CENSO RÁPIDO */
         .modal-container { background: white; width: 95%; max-width: 450px; border-radius: 8px; padding: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; margin: 20px auto; }
-        .seccion-titulo { background: var(--azul-ministerio); padding: 6px 10px; font-size: 0.8rem; font-weight: bold; color: white; margin: 15px 0 10px 0; border-radius: 4px; }
+        .seccion-titulo { background: var(--azul-ministerio); padding: 6px 10px; font-size: 0.8rem; font-weight: bold; color: white; margin: 15px 0 10px 0; border-radius: 4px; text-transform: uppercase; }
         
-        /* CHECKBOX TIPO SWITCH TÁCTICO */
-        .tactical-checks { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
-        .tactical-checks label { background: #e9ecef; padding: 8px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 5px; color: #333; flex: 1; min-width: 45%; justify-content: center;}
+        .tactical-checks label { display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: bold; color: #333; }
         .tactical-checks input[type="checkbox"] { transform: scale(1.3); }
+        .input-mini { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; font-size: 0.85rem; }
         
     </style>
 </head>
@@ -76,8 +75,7 @@
             </div>
             <div style="display: flex; align-items: center;">
                 <div id="user-info-badge">
-                    <span id="ui-nombre">Cargando...</span><br>
-                    <span id="ui-rol" style="font-weight:normal; font-size:0.65rem;">Conectando</span>
+                    <span id="header-user">Conectando...</span>
                 </div>
                 <button id="btn-abrir-buscar" class="btn-accion" style="background: var(--azul-ministerio); color: white; margin-right: 5px;">🔍</button>
                 <button id="btn-admin-panel" class="btn-accion" style="display: none; background: #ffc107; color: #000; border: none; margin-right: 5px;">Admin</button>
@@ -93,7 +91,6 @@
         </div>
     </div>
 
-    <!-- VISTA BÚSQUEDA -->
     <div id="search-view" style="background: var(--gris-fondo); padding: 20px; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="color: var(--azul-ministerio); margin: 0;">Búsqueda Territorial</h2>
@@ -115,7 +112,6 @@
         <div id="contenedor-resultados"></div>
     </div>
 
-    <!-- VISTA ADMIN -->
     <div id="admin-view" style="padding: 20px; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="color: var(--azul-ministerio); margin: 0;">Log Operativo</h2>
@@ -127,35 +123,59 @@
         </table>
     </div>
 
-    <!-- MODAL DE CENSO TÁCTICO (NUEVO DISEÑO RÁPIDO) -->
-<div id="modal-censo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,40,85,0.95); z-index: 2000; justify-content: center; align-items: center;">
-    <div class="modal-container">
-        <h3 style="color: var(--azul-ministerio); text-align: center;">Censo V.I.G.I.A.</h3>
-        
-        <div class="seccion-titulo">UBICACIÓN</div>
-        <div style="display: flex; gap: 5px;">
-            <input type="text" id="censo-padron-manual" placeholder="Padrón" style="flex:1; padding:8px;">
-            <input type="text" id="censo-manzana" placeholder="Mz" style="flex:1; padding:8px;">
-            <input type="text" id="censo-vivienda" placeholder="Viv" style="flex:1; padding:8px;">
-        </div>
+    <div id="modal-censo" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,40,85,0.95); z-index: 2000; justify-content: center; align-items: center;">
+        <div class="modal-container">
+            <h3 style="color: var(--azul-ministerio); text-align: center; margin-top: 0;">Censo V.I.G.I.A.</h3>
+            
+            <div class="seccion-titulo">UBICACIÓN</div>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="censo-padron-manual" class="input-mini" placeholder="Padrón">
+                <input type="text" id="censo-manzana" class="input-mini" placeholder="Manzana">
+                <input type="text" id="censo-vivienda" class="input-mini" placeholder="N° Viv.">
+            </div>
 
-        <div class="seccion-titulo">SERVICIOS</div>
-        <div style="display: flex; justify-content: space-between; padding: 5px;">
-            <label><input type="checkbox" id="c-luz"> Luz</label>
-            <label><input type="checkbox" id="c-agua"> Agua</label>
-            <label><input type="checkbox" id="c-net"> Internet</label>
-        </div>
+            <div class="seccion-titulo">TITULAR RESPONSABLE (Obligatorio)</div>
+            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                <input type="text" id="censo-ci" class="input-mini" placeholder="Cédula">
+                <input type="text" id="censo-alias" class="input-mini" placeholder="Alias">
+            </div>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="censo-nombre" class="input-mini" placeholder="Nombre">
+                <input type="text" id="censo-apellido" class="input-mini" placeholder="Apellido">
+            </div>
 
-        <div class="seccion-titulo">NÚCLEO FAMILIAR (Nombres, C.I., Edad)</div>
-        <textarea id="censo-familia" style="width:100%; height:60px;" placeholder="Ej: Maria Perez, 1234567, 30..."></textarea>
-        <label><input type="checkbox" id="c-estudios"> ¿Menores 3-17 años estudian?</label>
+            <div class="seccion-titulo">PLAN +BARRIO: SERVICIOS Y ENTORNO</div>
+            <div class="tactical-checks" style="display: flex; justify-content: space-between; padding: 5px; background: #e9ecef; border-radius: 4px; margin-bottom: 5px;">
+                <label><input type="checkbox" id="c-luz"> Luz</label>
+                <label><input type="checkbox" id="c-agua"> Agua</label>
+                <label><input type="checkbox" id="c-net"> Internet</label>
+            </div>
+            
+            <select id="censo-tenencia" class="input-mini" style="margin-bottom: 5px;">
+                <option value="No especifica">Situación de Tenencia...</option>
+                <option value="Propietario">Propietario</option>
+                <option value="Inquilino">Inquilino</option>
+                <option value="Ocupante">Ocupante</option>
+            </select>
 
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button id="btn-cancelar-censo" class="btn-primario" style="background:#6c757d;">Cerrar</button>
-            <button id="btn-guardar-censo" class="btn-primario">Guardar (5 min)</button>
+            <textarea id="censo-familia" class="input-mini" style="height:50px; margin-bottom: 5px;" placeholder="Núcleo Familiar (Ej: María, CI 1234, 30 años...)"></textarea>
+            
+            <div class="tactical-checks">
+                <label style="width: 100%;"><input type="checkbox" id="c-estudios"> ¿Los menores del hogar estudian?</label>
+            </div>
+
+            <div class="seccion-titulo">PERFIL DE INTELIGENCIA</div>
+            <div class="tactical-checks" style="margin-bottom: 5px;">
+                <label style="color: #dc3545; width: 100%;"><input type="checkbox" id="censo-antecedentes"> Titular posee antecedentes penales</label>
+            </div>
+            <input type="text" id="censo-vehiculos" class="input-mini" placeholder="Vehículos (Matrícula, Marca, Color)">
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button id="btn-cancelar-censo" class="btn-primario" style="background:#6c757d;">Cerrar</button>
+                <button id="btn-guardar-censo" class="btn-primario">Guardar Datos</button>
+            </div>
         </div>
     </div>
-</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
