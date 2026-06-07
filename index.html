@@ -21,8 +21,8 @@
         .btn-primario { background-color: var(--azul-ministerio); color: var(--blanco); border: none; padding: 0.9rem; width: 100%; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer; text-transform: uppercase; }
 
         #app-view, #admin-view, #search-view { display: none; height: 100vh; flex-direction: column; }
-        .header { background-color: var(--blanco); padding: 12px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 5px solid var(--azul-ministerio); z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .header-title { font-weight: 800; color: var(--azul-ministerio); font-size: 1.1rem; text-transform: uppercase; }
+        .header { background-color: var(--blanco); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 5px solid var(--azul-ministerio); z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .header-title { font-weight: 800; color: var(--azul-ministerio); font-size: 0.75rem; text-transform: uppercase; line-height: 1.1; max-width: 50%; }
         #mapa { flex: 1; width: 100%; z-index: 1; }
         
         .panel-inferior { background: var(--blanco); padding: 15px; border-top: 1px solid #ddd; z-index: 1000; }
@@ -48,7 +48,10 @@
 
     <div id="login-view">
         <div class="login-box">
-            <h2>V.I.G.I.A.</h2> <p style="margin-top:0; font-weight:bold; color:#555;">ZONA OPERACIONAL II</p>
+            <!-- Logo Login -->
+            <img src="logo_vigia.png" alt="V.I.G.I.A." style="width: 80px; display: block; margin: 0 auto 10px;">
+            <h2>V.I.G.I.A.</h2> 
+            <p style="margin-top:0; font-weight:bold; color:#555;">ZONA OPERACIONAL II</p>
             <div class="input-group"><label>Usuario</label><input type="email" id="doc" placeholder="Cédula@policia.uy"></div>
             <div class="input-group"><label>Contraseña</label><input type="password" id="pass" placeholder="***"></div>
             <button class="btn-primario" id="btn-login">Ingresar</button>
@@ -58,23 +61,24 @@
 
     <div id="app-view">
         <div class="header">
-            <div class="header-title">Vigilancia e Inteligencia para Gestión e Intervención en el Área</div>
-            <div style="display: flex; gap: 8px;">
-                <button id="btn-abrir-buscar" class="btn-accion" style="background: var(--azul-ministerio); color: white;">🔍 Buscar</button>
+            <div style="display: flex; align-items: center;">
+                <img src="logo_vigia.png" alt="Logo" style="height: 35px; margin-right: 10px;">
+                <div class="header-title">Vigilancia e Inteligencia para Gestión e Intervención en el Área</div>
+            </div>
+            <div style="display: flex; gap: 5px;">
+                <button id="btn-abrir-buscar" class="btn-accion" style="background: var(--azul-ministerio); color: white;">🔍</button>
                 <button id="btn-admin-panel" class="btn-accion" style="display: none; background: #ffc107; color: #000; border: none;">Admin</button>
                 <button id="btn-logout" class="btn-accion">Salir</button>
             </div>
         </div>
         <div id="mapa"></div>
         <div class="panel-inferior">
-        <div class="info-padr" id="resultado-padron">📍 Detectando espacio o vivienda...</div>
-        <button class="btn-primario" id="btn-ubicar" style="margin-bottom: 10px;">Ubicar Posición GPS</button>
-        <!-- NUEVO BOTÓN DE ALTA PROVISORIA -->
-        <button class="btn-primario" id="btn-crear-padron" style="background: #ffc107; color: #000; display: none; margin-bottom: 10px;">Crear Padrón Provisorio</button>
-        <button class="btn-primario" id="btn-censar" style="background: #28a745; display: none;">Iniciar Relevamiento</button>
+            <div class="info-padr" id="resultado-padron">📍 Detectando espacio o vivienda...</div>
+            <button class="btn-primario" id="btn-ubicar" style="margin-bottom: 10px;">Ubicar Posición GPS</button>
+            <button class="btn-primario" id="btn-crear-padron" style="background: #ffc107; color: #000; display: none; margin-bottom: 10px;">Crear Padrón Provisorio</button>
+            <button class="btn-primario" id="btn-censar" style="background: #28a745; display: none;">Iniciar Relevamiento</button>
         </div>
     </div>
-
     <div id="search-view" style="background: var(--gris-fondo); padding: 20px; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2 style="color: var(--azul-ministerio); margin: 0;">Búsqueda Territorial</h2>
