@@ -26,6 +26,9 @@
         .header { background-color: var(--blanco); padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 5px solid var(--azul-ministerio); position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .header-title { font-weight: 800; color: var(--azul-ministerio); font-size: 0.75rem; text-transform: uppercase; line-height: 1.1; max-width: 50%; }
         
+        #logo-principal { cursor: pointer; transition: transform 0.2s; }
+        #logo-principal:active { transform: scale(0.95); }
+
         /* BLOQUE DE USUARIO Y ROL */
         #user-info-badge { font-size: 0.7rem; background: #e9ecef; color: var(--azul-ministerio); padding: 4px 8px; border-radius: 4px; font-weight: bold; text-align: right; line-height: 1.2; margin-right: 5px;}
         
@@ -50,7 +53,6 @@
         .tactical-checks label { display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: bold; color: #333; }
         .tactical-checks input[type="checkbox"] { transform: scale(1.3); }
         .input-mini { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; font-size: 0.85rem; }
-        
     </style>
 </head>
 <body>
@@ -70,7 +72,7 @@
     <div id="app-view">
         <div class="header">
             <div style="display: flex; align-items: center; gap: 10px;">
-                <img src="logo_vigia.png" alt="Logo" style="height: 35px;">
+                <img src="logo_vigia.png" id="logo-principal" alt="Logo" style="height: 35px;">
                 <div class="header-title">V.I.G.I.A.</div>
             </div>
             <div style="display: flex; align-items: center;">
@@ -102,6 +104,9 @@
                     <option value="documento_identidad">Cédula de Identidad</option>
                     <option value="padron_asociado">Número de Padrón / Vivienda</option>
                     <option value="apellido">Apellido</option>
+                    <option value="nombre">Nombre</option>
+                    <option value="vehiculos">Matrícula de Vehículo</option>
+                    <option value="texto_libre">Texto Libre (Búsqueda General)</option>
                 </select>
             </div>
             <div class="input-group">
@@ -134,21 +139,28 @@
                 <input type="text" id="censo-vivienda" class="input-mini" placeholder="N° Viv.">
             </div>
 
-            <div class="seccion-titulo">TITULAR RESPONSABLE (Obligatorio)</div>
+            <div class="seccion-titulo">TITULAR RESPONSABLE</div>
             <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-                <input type="text" id="censo-ci" class="input-mini" placeholder="Cédula">
+                <input type="text" id="censo-ci" class="input-mini" placeholder="Cédula" list="cedulas-sugeridas" autocomplete="off">
+                <datalist id="cedulas-sugeridas"></datalist>
                 <input type="text" id="censo-alias" class="input-mini" placeholder="Alias">
             </div>
-            <div style="display: flex; gap: 5px;">
+            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
                 <input type="text" id="censo-nombre" class="input-mini" placeholder="Nombre">
                 <input type="text" id="censo-apellido" class="input-mini" placeholder="Apellido">
             </div>
+            <div style="display: flex; gap: 5px;">
+                <input type="tel" id="censo-telefono" class="input-mini" placeholder="Teléfono de Contacto">
+            </div>
 
-            <div class="seccion-titulo">PLAN +BARRIO: SERVICIOS Y ENTORNO</div>
+            <div class="seccion-titulo">PLAN +BARRIO & ACCIÓN SOCIAL</div>
             <div class="tactical-checks" style="display: flex; justify-content: space-between; padding: 5px; background: #e9ecef; border-radius: 4px; margin-bottom: 5px;">
                 <label><input type="checkbox" id="c-luz"> Luz</label>
                 <label><input type="checkbox" id="c-agua"> Agua</label>
                 <label><input type="checkbox" id="c-net"> Internet</label>
+            </div>
+            <div class="tactical-checks" style="margin-bottom: 5px;">
+                <label style="width: 100%;"><input type="checkbox" id="c-mides"> Beneficiario MIDES / Plan Intendencia</label>
             </div>
             
             <select id="censo-tenencia" class="input-mini" style="margin-bottom: 5px;">
@@ -158,17 +170,25 @@
                 <option value="Ocupante">Ocupante</option>
             </select>
 
-            <textarea id="censo-familia" class="input-mini" style="height:50px; margin-bottom: 5px;" placeholder="Núcleo Familiar (Ej: María, CI 1234, 30 años...)"></textarea>
+            <textarea id="censo-familia" class="input-mini" style="height:50px; margin-bottom: 5px;" placeholder="Núcleo Familiar (Nombres, C.I., Edad opcional de integrantes...)"></textarea>
             
             <div class="tactical-checks">
-                <label style="width: 100%;"><input type="checkbox" id="c-estudios"> ¿Los menores del hogar estudian?</label>
+                <label style="width: 100%;"><input type="checkbox" id="c-estudios"> ¿Menores (3 a 17 años) están cursando estudios?</label>
             </div>
 
-            <div class="seccion-titulo">PERFIL DE INTELIGENCIA</div>
+            <div class="seccion-titulo">PERFIL DE INTELIGENCIA POLICIAL</div>
             <div class="tactical-checks" style="margin-bottom: 5px;">
-                <label style="color: #dc3545; width: 100%;"><input type="checkbox" id="censo-antecedentes"> Titular posee antecedentes penales</label>
+                <label style="color: #dc3545; width: 100%;"><input type="checkbox" id="censo-antecedentes"> El titular posee antecedentes penales</label>
             </div>
-            <input type="text" id="censo-vehiculos" class="input-mini" placeholder="Vehículos (Matrícula, Marca, Color)">
+            
+            <select id="censo-arresto" class="input-mini" style="margin-bottom: 5px;">
+                <option value="No">No cumple arresto domiciliario</option>
+                <option value="Total">Arresto Domiciliario Total</option>
+                <option value="Parcial">Arresto Domiciliario Parcial</option>
+            </select>
+            <input type="text" id="censo-arresto-horario" class="input-mini" style="display:none; margin-bottom: 5px;" placeholder="Definir Horario de Restricción (ej: 22:00 a 06:00)">
+
+            <input type="text" id="censo-vehiculos" class="input-mini" placeholder="Vehículos asociados (Matrícula, Marca, Color)">
 
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button id="btn-cancelar-censo" class="btn-primario" style="background:#6c757d;">Cerrar</button>
