@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
         search: document.getElementById('search-view')
     };
 
-    let map, marker;
+    let map, marker, geojsonLayer;
     let padronUbicacionActual = "Desconocido";
     let ultimaLat = null;
     let ultimaLon = null;
@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if(vistaDestino === 'app' && map) setTimeout(() => { map.invalidateSize(); }, 200);
     }
 
+    // Intersección del logo para salir instantáneamente a pantalla principal
+    document.getElementById('logo-principal').addEventListener('click', () => cambiarVista('app'));
+
     // --- SEGURIDAD ---
     async function checkSession() {
         const { data: { session } } = await db.auth.getSession();
@@ -31,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     async function validarRol(email) {
-        // Mostrar el usuario en el header si existe el elemento en el HTML
         const headerUser = document.getElementById('header-user');
         if(headerUser) headerUser.innerText = `Usuario: ${email}`;
 
@@ -42,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         iniciarApp();
     }
 
-    // --- LISTENERS DE SESIÓN Y NAVEGACIÓN ---
+    // --- LISTENERS DE SESIÓN Y VISTAS ---
     document.getElementById('btn-login').addEventListener('click', async () => {
         const e = document.getElementById('doc').value;
         const p = document.getElementById('pass').value;
@@ -66,6 +68,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-abrir-buscar').addEventListener('click', () => cambiarVista('search'));
     document.getElementById('btn-cerrar-buscar').addEventListener('click', () => cambiarVista('app'));
     document.getElementById('btn-cerrar-admin').addEventListener('click', () => cambiarVista('app'));
+
+    // --- DESPLIEGUE CONDICIONAL HORARIOS ARRESTO ---
+    document.getElementById('censo-arresto').addEventListener('change', (e) => {
+        const campoHorario = document.getElementById('censo-arresto-horario');
+        campoHorario.style.display = (e.target.value === 'Parcial') ? 'block' : 'none';
+    });
 
     // --- MOTOR DE GEOCODIFICACIÓN (CALLES) ---
     async function obtenerCalle(lat, lon) {
@@ -100,6 +108,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function iniciarApp() {
+        cambiarVista('app');
+        if (!map) {
+            map = L.map('mapa').setView([-34.898, -54.945], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            map.on('click', (e) => procesarUbicacion(e.latlng.lat, e.latlng.lng));
+
+            // CARGA DEL PLANO AUTOCAD DE REALOJO (SI EXISTE EL GEOJSON)
+            fetch('barrio_realojo.geojson')
+                .then(res => res.json())
+                .then(geojsonData => {
+                    geojsonLayer = L.geoJSON(geojsonData, {
+                        style: { color: "#ff7800", weight: 2, opacity: 0.65 },
+                        onEachFeature: function (feature, layer) {
+                            if (feature.properties && feature.properties.numero_padron) {
+                                layer.bindPopup(`<b>Padrón Realojo:</b> ${feature.properties.numero_padron}`);
+                            }
+                        }
+                    }).addTo(map);
+                }).catch(e => console.log("Plano de realojo vectorizado no detectado de forma local. Continuando con cartografía base."));
+        }
+    }
+
     document.getElementById('btn-ubicar').addEventListener('click', () => {
         if ("geolocation" in navigator) {
             document.getElementById('btn-ubicar').innerText = "Satélites...";
@@ -118,111 +149,178 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-censar').style.display = 'block';
     });
 
-    function iniciarApp() {
-        cambiarVista('app');
-        if (!map) {
-            map = L.map('mapa').setView([-34.898, -54.945], 14);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            map.on('click', (e) => procesarUbicacion(e.latlng.lat, e.latlng.lng));
-        }
-    }
+    // --- BUSCADOR / AUTOCAMPLETADO DE CÉDULAS EN TIEMPO REAL ---
+    document.getElementById('censo-ci').addEventListener('input', async (e) => {
+        const ciDigitada = e.target.value.trim();
+        const datalist = document.getElementById('cedulas-sugeridas');
+        datalist.innerHTML = '';
 
-    // --- CENSO PLAN +BARRIO ---
+        if (ciDigitada.length >= 3) {
+            const { data } = await db.from('personas').select('documento_identidad, nombre, apellido, alias, telefono, observaciones_seguridad, padron_asociado, servicios_basicos, composicion_familiar, menores_estudiando, tiene_antecedentes, arresto_domiciliario, arresto_horario, vehiculos').ilike('documento_identidad', `${ciDigitada}%`).limit(5);
+            
+            if (data) {
+                data.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p.documento_identidad;
+                    option.innerText = `${p.nombre} ${p.apellido} ${p.alias ? `(Alias: ${p.alias})` : ''}`;
+                    datalist.appendChild(option);
+                });
+
+                // Si la cédula ingresada coincide exactamente con una de la base de datos, volcamos sus datos históricos para modificarlos
+                const coincidenciaExacta = data.find(p => p.documento_identidad === ciDigitada);
+                if (coincidenciaExacta) {
+                    document.getElementById('censo-nombre').value = coincidenciaExacta.nombre || '';
+                    document.getElementById('censo-apellido').value = coincidenciaExacta.apellido || '';
+                    document.getElementById('censo-alias').value = coincidenciaExacta.alias || '';
+                    document.getElementById('censo-telefono').value = coincidenciaExacta.telefono || '';
+                    document.getElementById('censo-padron-manual').value = coincidenciaExacta.padron_asociado || '';
+                    document.getElementById('censo-familia').value = coincidenciaExacta.composicion_familiar || '';
+                    document.getElementById('censo-vehiculos').value = coincidenciaExacta.vehiculos || '';
+                    
+                    document.getElementById('censo-antecedentes').checked = coincidenciaExacta.tiene_antecedentes || false;
+                    document.getElementById('c-estudios').checked = coincidenciaExacta.menores_estudiando || false;
+                    
+                    if(coincidenciaExacta.servicios_basicos) {
+                        document.getElementById('c-luz').checked = coincidenciaExacta.servicios_basicos.includes('Luz');
+                        document.getElementById('c-agua').checked = coincidenciaExacta.servicios_basicos.includes('Agua');
+                        document.getElementById('c-net').checked = coincidenciaExacta.servicios_basicos.includes('Net');
+                    }
+                    
+                    if(coincidenciaExacta.observaciones_seguridad) {
+                        document.getElementById('c-mides').checked = coincidenciaExacta.observaciones_seguridad.includes('[BENEFICIARIO MIDES/IDM]');
+                    }
+
+                    document.getElementById('censo-arresto').value = coincidenciaExacta.arresto_domiciliario || 'No';
+                    if (coincidenciaExacta.arresto_domiciliario === 'Parcial') {
+                        document.getElementById('censo-arresto-horario').style.display = 'block';
+                        document.getElementById('censo-arresto-horario').value = coincidenciaExacta.arresto_horario || '';
+                    } else {
+                        document.getElementById('censo-arresto-horario').style.display = 'none';
+                    }
+                }
+            }
+        }
+    });
+
+    // --- RELEVAMIENTO PLAN +BARRIO Y OPERATIVO ---
     document.getElementById('btn-censar').addEventListener('click', () => document.getElementById('modal-censo').style.display = 'flex');
     document.getElementById('btn-cancelar-censo').addEventListener('click', () => document.getElementById('modal-censo').style.display = 'none');
 
     document.getElementById('btn-guardar-censo').addEventListener('click', async () => {
         const btn = document.getElementById('btn-guardar-censo');
-        const padronMan = document.getElementById('censo-padron-manual')?.value || '';
-        const padronFinal = padronMan || padronUbicacionActual;
+        const ci = document.getElementById('censo-ci').value.trim();
+        const nom = document.getElementById('censo-nombre').value.trim();
+        const ape = document.getElementById('censo-apellido').value.trim();
         
-        const ci = document.getElementById('censo-ci')?.value || '';
-        const nom = document.getElementById('censo-nombre')?.value || '';
-        const ape = document.getElementById('censo-apellido')?.value || '';
-        
-        if(!ci || !nom || !ape) { alert("Complete CI, Nombre y Apellido del Titular."); return; }
-        
+        if(!ci || !nom || !ape) { alert("Ingrese Cédula, Nombre y Apellido."); return; }
         btn.innerText = "Guardando...";
 
-        // Captura Plan +Barrio
-        const luz = document.getElementById('c-luz')?.checked || false;
-        const agua = document.getElementById('c-agua')?.checked || false;
-        const net = document.getElementById('c-net')?.checked || false;
-        const studies = document.getElementById('c-estudios')?.checked || false;
-        
-        // Algoritmo de vulnerabilidad
+        const luz = document.getElementById('c-luz').checked;
+        const agua = document.getElementById('c-agua').checked;
+        const net = document.getElementById('c-net').checked;
+        const mides = document.getElementById('c-mides').checked;
+        const studies = document.getElementById('c-estudios').checked;
+        const arrestoTipo = document.getElementById('censo-arresto').value;
+        const arrestoHora = document.getElementById('censo-arresto-horario').value;
+
+        // Evaluación automática del nivel de vulnerabilidad del Plan +Barrio
         const esVulnerable = (!luz || !agua || !net || !studies);
         const servicios = [luz?'Luz':'', agua?'Agua':'', net?'Net':''].filter(Boolean).join(', ');
 
-        // Agrupar observaciones y ubicación manual
-        let obs = `[LOC] Mz: ${document.getElementById('censo-manzana')?.value || '-'} | Viv: ${document.getElementById('censo-vivienda')?.value || '-'} | [VEH] ${document.getElementById('censo-vehiculos')?.value || ''} | [TEN] ${document.getElementById('censo-tenencia')?.value || ''}`;
-        
-        const { error } = await db.from('personas').insert([{
-            documento_identidad: ci, 
-            nombre: nom, 
-            apellido: ape, 
-            alias: document.getElementById('censo-alias')?.value || '',
-            tiene_antecedentes: document.getElementById('censo-antecedentes')?.checked || false, 
-            observaciones_seguridad: obs, 
-            padron_asociado: padronFinal,
+        let obs = `[LOC] Mz: ${document.getElementById('censo-manzana').value || '-'} | Viv: ${document.getElementById('censo-vivienda').value || '-'} `;
+        if (mides) obs += `| [BENEFICIARIO MIDES/IDM] `;
+        if (arrestoTipo !== 'No') obs += `| [ARRESTO DOMICILIARIO: ${arrestoTipo}] ${arrestoTipo === 'Parcial' ? `Horario: ${arrestoHora}` : ''} `;
+
+        const payload = {
+            documento_identidad: ci,
+            nombre: nom,
+            apellido: ape,
+            alias: document.getElementById('censo-alias').value,
+            telefono: document.getElementById('censo-telefono').value,
+            tiene_antecedentes: document.getElementById('censo-antecedentes').checked,
+            observaciones_seguridad: obs,
+            padron_asociado: document.getElementById('censo-padron-manual').value || padronUbicacionActual,
             servicios_basicos: servicios,
-            composicion_familiar: document.getElementById('censo-familia')?.value || '',
+            composicion_familiar: document.getElementById('censo-familia').value,
             menores_estudiando: studies,
             vulnerabilidad: esVulnerable,
-            lat: ultimaLat,
-            lon: ultimaLon
-        }]);
+            arresto_domiciliario: arrestoTipo,
+            arresto_horario: arrestoTipo === 'Parcial' ? arrestoHora : null,
+            vehiculos: document.getElementById('censo-vehiculos').value
+        };
+
+        // Si se capturaron coordenadas GPS válidas en esta sesión, las actualizamos
+        if(ultimaLat && ultimaLon) {
+            payload.lat = ultimaLat;
+            payload.lon = ultimaLon;
+        }
+
+        // Operación UPSERT: Si la cédula ya existe, pisa y actualiza los campos; si no, genera un registro nuevo
+        const { error } = await db.from('personas').upsert([payload], { onConflict: 'documento_identidad' });
 
         if (error) alert("Error: " + error.message);
         else {
-            alert("Censo Guardado. Nivel de Vulnerabilidad: " + (esVulnerable ? "ALTA ⚠️" : "BAJA ✅"));
+            alert("Registro procesado correctamente. Vulnerabilidad: " + (esVulnerable ? "ALTA ⚠️" : "BAJA ✅"));
             document.getElementById('modal-censo').style.display = 'none';
             
-            // Limpieza del modal
-            const camposLimpiar = ['censo-ci','censo-nombre','censo-apellido','censo-alias','censo-vehiculos','censo-padron-manual','censo-manzana','censo-vivienda', 'censo-familia'];
+            // Limpieza integral de campos
+            const camposLimpiar = ['censo-ci','censo-nombre','censo-apellido','censo-alias','censo-telefono','censo-padron-manual','censo-manzana','censo-vivienda', 'censo-familia', 'censo-vehiculos', 'censo-arresto-horario'];
             camposLimpiar.forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
-            ['c-luz', 'c-agua', 'c-net', 'c-estudios', 'censo-antecedentes'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).checked = false; });
-            if(document.getElementById('censo-tenencia')) document.getElementById('censo-tenencia').value = "No especifica";
+            ['c-luz', 'c-agua', 'c-net', 'c-mides', 'c-estudios', 'censo-antecedentes'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).checked = false; });
+            document.getElementById('censo-arresto').value = "No";
+            document.getElementById('censo-arresto-horario').style.display = 'none';
         }
         btn.innerText = "Guardar Datos";
     });
 
-    // --- BÚSQUEDA TÁCTICA MEJORADA ---
+    // --- CONSULTAS Y CONSULTORÍA TÁCTICA AVANZADA ---
     document.getElementById('btn-ejecutar-busqueda').addEventListener('click', async () => {
         const tipo = document.getElementById('search-tipo').value;
-        const valor = document.getElementById('search-valor').value;
+        const valor = document.getElementById('search-valor').value.trim();
         const contenedor = document.getElementById('contenedor-resultados');
         
         if(!valor) return;
-        contenedor.innerHTML = "<p>Consultando base...</p>";
+        contenedor.innerHTML = "<p>Consultando base de inteligencia...</p>";
         
-        const { data, error } = await db.from('personas').select('*').ilike(tipo, `%${valor}%`);
+        let query = db.from('personas').select('*');
 
-        if (error) contenedor.innerHTML = `<p style="color:red;">Error de conexión.</p>`;
-        else if (data.length === 0) contenedor.innerHTML = `<p>No se encontraron registros.</p>`;
+        // Segmentación algorítmica de los rangos solicitados de búsqueda avanzada
+        if (tipo === 'texto_libre') {
+            query = query.or(`nombre.ilike.%${valor}%,apellido.ilike.%${valor}%,alias.ilike.%${valor}%,observaciones_seguridad.ilike.%${valor}%,composicion_familiar.ilike.%${valor}%`);
+        } else if (tipo === 'vehiculos') {
+            query = query.ilike('vehiculos', `%${valor}%`);
+        } else {
+            query = query.ilike(tipo, `%${valor}%`);
+        }
+        
+        const { data, error } = await query;
+
+        if (error) contenedor.innerHTML = `<p style="color:red;">Error de comunicación con la base.</p>`;
+        else if (!data || data.length === 0) contenedor.innerHTML = `<p>No se localizaron registros coincidentes.</p>`;
         else {
             contenedor.innerHTML = '';
             for (const p of data) {
-                // Traducción de coordenadas a calle (OSM Nominatim)
                 const direccion = await obtenerCalle(p.lat, p.lon);
                 
-                // Alertas visuales
-                const alertaVuln = p.vulnerabilidad ? `<span style="color:#dc3545; font-weight:bold;">⚠️ VULNERABLE</span>` : `<span style="color:#28a745;">Estable</span>`;
-                const alertaAnt = p.tiene_antecedentes ? `<span style="color:#dc3545; font-weight:bold;">| ⚠️ ANTECEDENTES</span>` : ``;
-                
+                const alertaVuln = p.vulnerabilidad ? `<span style="color:#dc3545; font-weight:bold;">⚠️ REGISTRO VULNERABLE</span>` : `<span style="color:#28a745;">Entorno Estable</span>`;
+                const alertaAnt = p.tiene_antecedentes ? `<span style="color:#dc3545; font-weight:bold;">| ⚠️ POSEE ANTECEDENTES</span>` : ``;
+                const alertaArresto = (p.arresto_domiciliario && p.arresto_domiciliario !== 'No') ? `<span style="background:#dc3545; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:0.75rem; display:inline-block; margin-top:5px;">🚨 ARRESTO DOMICILIARIO ${p.arresto_domiciliario.toUpperCase()} ${p.arresto_horario ? `(${p.arresto_horario})` : ''}</span>` : ``;
+
                 const ficha = document.createElement('div');
-                ficha.className = `ficha-resultado ${p.vulnerabilidad || p.tiene_antecedentes ? 'alerta' : ''}`;
+                ficha.className = `ficha-resultado ${p.vulnerabilidad || p.tiene_antecedentes || (p.arresto_domiciliario !== 'No') ? 'alerta' : ''}`;
                 ficha.innerHTML = `
                     <div class="ficha-ubicacion">📍 Padrón: ${p.padron_asociado} - ${direccion}</div>
                     <h4 class="ficha-nombre">${p.nombre} ${p.apellido} ${p.alias ? `("${p.alias}")` : ''}</h4>
-                    <p class="ficha-datos">C.I: ${p.documento_identidad} | Estado: ${alertaVuln} ${alertaAnt}</p>
-                    <p class="ficha-datos"><b>Servicios:</b> ${p.servicios_basicos || 'Sin registrar'}</p>
-                    <div class="ficha-obs">${p.observaciones_seguridad || ''}</div>
-                    <div class="ficha-obs" style="margin-top:5px;"><b>Grupo Familiar:</b><br>${p.composicion_familiar || 'No registrado'}</div>
+                    <p class="ficha-datos"><b>C.I:</b> ${p.documento_identidad} | <b>Tel:</b> ${p.telefono || 'Sin registrar'}</p>
+                    <p class="ficha-datos"><b>Estado:</b> ${alertaVuln} ${alertaAnt}</p>
+                    ${alertaArresto}
+                    <p class="ficha-datos" style="margin-top:8px;"><b>Servicios:</b> ${p.servicios_basicos || 'Ninguno'}</p>
+                    <p class="ficha-datos"><b>Vehículos:</b> ${p.vehiculos || 'Ninguno registrado'}</p>
+                    <div class="ficha-obs"><b>Detalles de ubicación:</b><br>${p.observaciones_seguridad || ''}</div>
+                    <div class="ficha-obs"><b>Composición de Familia:</b><br>${p.composicion_familiar || 'Sin datos de núcleo'}</div>
                     <button class="btn-primario" style="margin-top:10px; padding:8px; font-size:0.9rem;">Ver Ubicación en Mapa</button>
                 `;
                 
-                // Botón para saltar al mapa
                 ficha.querySelector('button').addEventListener('click', () => {
                     if (p.lat && p.lon) {
                         cambiarVista('app');
@@ -230,16 +328,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         if(marker) map.removeLayer(marker);
                         marker = L.marker([p.lat, p.lon]).addTo(map).bindPopup(`<b>${p.nombre} ${p.apellido}</b><br>${direccion}`).openPopup();
                     } else {
-                        alert("Este registro fue guardado sin coordenadas GPS.");
+                        alert("Este censo histórico no cuenta con coordenadas GPS.");
                     }
                 });
-                
                 contenedor.appendChild(ficha);
             }
         }
     });
 
-    // --- PANEL DE ADMINISTRADOR ---
+    // --- PANEL DE AUDITORÍA (ADMIN) ---
     document.getElementById('btn-admin-panel').addEventListener('click', async () => {
         cambiarVista('admin');
         const { data } = await db.from('logs_auditoria').select('*').order('fecha_hora', { ascending: false }).limit(30);
