@@ -12,10 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
         search: document.getElementById('search-view')
     };
 
-    let map, marker;
+    let map, marker, capaOSM, capaPlano;
+    let modoPlanoActivo = false;
     let padronUbicacionActual = "Desconocido";
     let ultimaLat = null;
     let ultimaLon = null;
+
+    // Coordenadas fijas para la imagen (no importa si no coinciden perfecto con el mundo real ahora)
+    const limitesPlano = [[-34.8960, -54.9270], [-34.9045, -54.9160]];
 
     // --- FUNCIONES DE NAVEGACIÓN ---
     function cambiarVista(vistaDestino) {
@@ -24,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if(vistaDestino === 'app' && map) setTimeout(() => { map.invalidateSize(); }, 200);
     }
 
-    // Intersección del logo para salir instantáneamente a pantalla principal
     document.getElementById('logo-principal').addEventListener('click', () => cambiarVista('app'));
 
     // --- SEGURIDAD ---
@@ -69,13 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-cerrar-buscar').addEventListener('click', () => cambiarVista('app'));
     document.getElementById('btn-cerrar-admin').addEventListener('click', () => cambiarVista('app'));
 
-    // --- DESPLIEGUE CONDICIONAL HORARIOS ARRESTO ---
     document.getElementById('censo-arresto').addEventListener('change', (e) => {
         const campoHorario = document.getElementById('censo-arresto-horario');
         campoHorario.style.display = (e.target.value === 'Parcial') ? 'block' : 'none';
     });
 
-    // --- MOTOR DE GEOCODIFICACIÓN (CALLES) ---
     async function obtenerCalle(lat, lon) {
         if (!lat || !lon) return "Ubicación GPS no guardada";
         try {
@@ -85,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch { return "Dirección no disponible"; }
     }
 
-    // --- MOTOR DE MAPA ---
+    // --- MOTOR DE MAPA Y CAPAS ---
     async function procesarUbicacion(lat, lon) {
         ultimaLat = lat; ultimaLon = lon;
         if(marker) map.removeLayer(marker);
@@ -97,13 +98,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const { data } = await db.rpc('padron_actual', { lon: lon, lat: lat });
         
-        if (data && data.length > 0) {
+        if (data && data.length > 0 && !modoPlanoActivo) {
             padronUbicacionActual = data[0].numero_padron;
             document.getElementById('resultado-padron').innerText = `Padrón / Vivienda: ${padronUbicacionActual}`;
             document.getElementById('btn-censar').style.display = 'block';
         } else {
-            padronUbicacionActual = "Vía Pública";
-            document.getElementById('resultado-padron').innerText = "Vía Pública / Fuera de cartografía";
+            padronUbicacionActual = modoPlanoActivo ? "Padrón Realojo (Manual)" : "Vía Pública";
+            document.getElementById('resultado-padron').innerText = modoPlanoActivo ? "📍 Sector del Plano Seleccionado" : "Vía Pública / Fuera de cartografía";
             document.getElementById('btn-crear-padron').style.display = 'block';
         }
     }
@@ -111,25 +112,41 @@ document.addEventListener('DOMContentLoaded', () => {
     function iniciarApp() {
         cambiarVista('app');
         if (!map) {
-            // Centramos el mapa directo en el cuadrante del Realojo Kennedy
             map = L.map('mapa').setView([-34.9000, -54.9220], 15);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            
+            // Capa 1: Satélite / Calles normal
+            capaOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+            capaOSM.addTo(map);
+            
+            // Capa 2: La imagen en PNG (con opacidad 100% para verse perfecta sola)
+            capaPlano = L.imageOverlay('plano_kennedy.png', limitesPlano, {
+                opacity: 1, 
+                interactive: false 
+            });
+
             map.on('click', (e) => procesarUbicacion(e.latlng.lat, e.latlng.lng));
-
-            // --- PLAN B: SUPERPOSICIÓN DE IMAGEN DEL PLANO (REALOJO KENNEDY) ---
-            // Coordenadas calculadas según Cañada Salada y la curvatura de la avenida
-            const limitesPlano = [
-                [-34.8960, -54.9270], // Esquina Superior Izquierda (Noroeste) - Cerca de la Perimetral y Canchas
-                [-34.9045, -54.9160]  // Esquina Inferior Derecha (Sureste) - Curva de la cañada
-            ];
-
-            // Inserción táctica de la imagen
-            L.imageOverlay('plano_kennedy.png', limitesPlano, {
-                opacity: 0.65, // Transparencia para ver OSM debajo
-                interactive: false // Permite que el clic pase a través de la imagen para marcar GPS
-            }).addTo(map);
         }
     }
+
+    // LÓGICA DEL BOTÓN ALTERNAR MAPA/PLANO
+    document.getElementById('btn-modo-plano').addEventListener('click', () => {
+        modoPlanoActivo = !modoPlanoActivo;
+        const btn = document.getElementById('btn-modo-plano');
+        
+        if (modoPlanoActivo) {
+            map.removeLayer(capaOSM); // Apagamos el mundo real
+            capaPlano.addTo(map);     // Encendemos el dibujo
+            map.fitBounds(limitesPlano); // Zoom automático al barrio
+            btn.innerText = "🌍 Volver a Mapa GPS";
+            btn.style.background = "#6c757d";
+            document.getElementById('resultado-padron').innerText = "🗺️ Modo Plano Activo. Toque un lote.";
+        } else {
+            map.removeLayer(capaPlano); // Apagamos el dibujo
+            capaOSM.addTo(map);         // Encendemos el mundo real
+            btn.innerText = "🗺️ Ver Plano Realojo";
+            btn.style.background = "#17a2b8";
+        }
+    });
 
     document.getElementById('btn-ubicar').addEventListener('click', () => {
         if ("geolocation" in navigator) {
@@ -143,8 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-crear-padron').addEventListener('click', () => {
-        padronUbicacionActual = 'PROV-' + Math.floor(Math.random() * 1000000);
-        document.getElementById('resultado-padron').innerText = `Alta Táctica: ${padronUbicacionActual}`;
+        padronUbicacionActual = modoPlanoActivo ? 'REALOJO-' + Math.floor(Math.random() * 10000) : 'PROV-' + Math.floor(Math.random() * 1000000);
+        document.getElementById('resultado-padron').innerText = `Padrón Asignado: ${padronUbicacionActual}`;
         document.getElementById('btn-crear-padron').style.display = 'none';
         document.getElementById('btn-censar').style.display = 'block';
     });
@@ -318,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ficha.querySelector('button').addEventListener('click', () => {
                     if (p.lat && p.lon) {
                         cambiarVista('app');
+                        if (modoPlanoActivo) document.getElementById('btn-modo-plano').click(); // Si estaba en el plano, lo saca para ver la calle real
                         map.setView([p.lat, p.lon], 18);
                         if(marker) map.removeLayer(marker);
                         marker = L.marker([p.lat, p.lon]).addTo(map).bindPopup(`<b>${p.nombre} ${p.apellido}</b><br>${direccion}`).openPopup();
