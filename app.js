@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ];
 
             // Inserción táctica de la imagen
-            L.imageOverlay('plano_kennedy.jpg', limitesPlano, {
+            L.imageOverlay('plano_kennedy.png', limitesPlano, {
                 opacity: 0.65, // Transparencia para ver OSM debajo
                 interactive: false // Permite que el clic pase a través de la imagen para marcar GPS
             }).addTo(map);
