@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
         search: document.getElementById('search-view')
     };
 
-    let map, marker, geojsonLayer;
+    let map, marker;
     let padronUbicacionActual = "Desconocido";
     let ultimaLat = null;
     let ultimaLon = null;
@@ -111,23 +111,23 @@ document.addEventListener('DOMContentLoaded', () => {
     function iniciarApp() {
         cambiarVista('app');
         if (!map) {
-            map = L.map('mapa').setView([-34.898, -54.945], 14);
+            // Centramos el mapa directo en el cuadrante del Realojo Kennedy
+            map = L.map('mapa').setView([-34.9000, -54.9220], 15);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             map.on('click', (e) => procesarUbicacion(e.latlng.lat, e.latlng.lng));
 
-            // CARGA DEL PLANO AUTOCAD DE REALOJO (SI EXISTE EL GEOJSON)
-            fetch('barrio_realojo.geojson')
-                .then(res => res.json())
-                .then(geojsonData => {
-                    geojsonLayer = L.geoJSON(geojsonData, {
-                        style: { color: "#ff7800", weight: 2, opacity: 0.65 },
-                        onEachFeature: function (feature, layer) {
-                            if (feature.properties && feature.properties.numero_padron) {
-                                layer.bindPopup(`<b>Padrón Realojo:</b> ${feature.properties.numero_padron}`);
-                            }
-                        }
-                    }).addTo(map);
-                }).catch(e => console.log("Plano de realojo vectorizado no detectado de forma local. Continuando con cartografía base."));
+            // --- PLAN B: SUPERPOSICIÓN DE IMAGEN DEL PLANO (REALOJO KENNEDY) ---
+            // Coordenadas calculadas según Cañada Salada y la curvatura de la avenida
+            const limitesPlano = [
+                [-34.8960, -54.9270], // Esquina Superior Izquierda (Noroeste) - Cerca de la Perimetral y Canchas
+                [-34.9045, -54.9160]  // Esquina Inferior Derecha (Sureste) - Curva de la cañada
+            ];
+
+            // Inserción táctica de la imagen
+            L.imageOverlay('plano_kennedy.jpg', limitesPlano, {
+                opacity: 0.65, // Transparencia para ver OSM debajo
+                interactive: false // Permite que el clic pase a través de la imagen para marcar GPS
+            }).addTo(map);
         }
     }
 
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-censar').style.display = 'block';
     });
 
-    // --- BUSCADOR / AUTOCAMPLETADO DE CÉDULAS EN TIEMPO REAL ---
+    // --- BUSCADOR / AUTOCOMPLETADO DE CÉDULAS EN TIEMPO REAL ---
     document.getElementById('censo-ci').addEventListener('input', async (e) => {
         const ciDigitada = e.target.value.trim();
         const datalist = document.getElementById('cedulas-sugeridas');
@@ -166,7 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     datalist.appendChild(option);
                 });
 
-                // Si la cédula ingresada coincide exactamente con una de la base de datos, volcamos sus datos históricos para modificarlos
                 const coincidenciaExacta = data.find(p => p.documento_identidad === ciDigitada);
                 if (coincidenciaExacta) {
                     document.getElementById('censo-nombre').value = coincidenciaExacta.nombre || '';
@@ -223,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const arrestoTipo = document.getElementById('censo-arresto').value;
         const arrestoHora = document.getElementById('censo-arresto-horario').value;
 
-        // Evaluación automática del nivel de vulnerabilidad del Plan +Barrio
         const esVulnerable = (!luz || !agua || !net || !studies);
         const servicios = [luz?'Luz':'', agua?'Agua':'', net?'Net':''].filter(Boolean).join(', ');
 
@@ -249,13 +247,11 @@ document.addEventListener('DOMContentLoaded', () => {
             vehiculos: document.getElementById('censo-vehiculos').value
         };
 
-        // Si se capturaron coordenadas GPS válidas en esta sesión, las actualizamos
         if(ultimaLat && ultimaLon) {
             payload.lat = ultimaLat;
             payload.lon = ultimaLon;
         }
 
-        // Operación UPSERT: Si la cédula ya existe, pisa y actualiza los campos; si no, genera un registro nuevo
         const { error } = await db.from('personas').upsert([payload], { onConflict: 'documento_identidad' });
 
         if (error) alert("Error: " + error.message);
@@ -263,7 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Registro procesado correctamente. Vulnerabilidad: " + (esVulnerable ? "ALTA ⚠️" : "BAJA ✅"));
             document.getElementById('modal-censo').style.display = 'none';
             
-            // Limpieza integral de campos
             const camposLimpiar = ['censo-ci','censo-nombre','censo-apellido','censo-alias','censo-telefono','censo-padron-manual','censo-manzana','censo-vivienda', 'censo-familia', 'censo-vehiculos', 'censo-arresto-horario'];
             camposLimpiar.forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
             ['c-luz', 'c-agua', 'c-net', 'c-mides', 'c-estudios', 'censo-antecedentes'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).checked = false; });
@@ -284,7 +279,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let query = db.from('personas').select('*');
 
-        // Segmentación algorítmica de los rangos solicitados de búsqueda avanzada
         if (tipo === 'texto_libre') {
             query = query.or(`nombre.ilike.%${valor}%,apellido.ilike.%${valor}%,alias.ilike.%${valor}%,observaciones_seguridad.ilike.%${valor}%,composicion_familiar.ilike.%${valor}%`);
         } else if (tipo === 'vehiculos') {
