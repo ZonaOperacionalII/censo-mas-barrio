@@ -17,12 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let padronUbicacionActual = "Desconocido";
     let ultimaLat = null;
     let ultimaLon = null;
-    let usuarioLogueado = "Desconocido"; // Variable para el Log de Auditoría
+    let usuarioLogueado = "Desconocido";
 
-    // Coordenadas ajustadas para la imagen VERTICAL (Norte hacia arriba)
     const limitesPlano = [[-34.8850, -54.9250], [-34.9080, -54.9120]];
 
-    // --- FUNCIONES DE NAVEGACIÓN ---
     function cambiarVista(vistaDestino) {
         Object.values(views).forEach(v => v.style.display = 'none');
         views[vistaDestino].style.display = 'flex';
@@ -31,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('logo-principal').addEventListener('click', () => cambiarVista('app'));
 
-    // --- SISTEMA DE AUDITORÍA (TRACKER) ---
     async function registrarLog(accion, tabla) {
         if (usuarioLogueado === "Desconocido") return;
         await db.from('logs_auditoria').insert([{
@@ -41,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }]);
     }
 
-    // --- SEGURIDAD ---
     async function checkSession() {
         const { data: { session } } = await db.auth.getSession();
         if (session) {
@@ -62,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
         iniciarApp();
     }
 
-    // --- LISTENERS DE SESIÓN Y VISTAS ---
     document.getElementById('btn-login').addEventListener('click', async () => {
         const e = document.getElementById('doc').value;
         const p = document.getElementById('pass').value;
@@ -103,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch { return "Dirección no disponible"; }
     }
 
-    // --- MOTOR DE MAPA Y CAPAS ---
     async function procesarUbicacion(lat, lon) {
         ultimaLat = lat; ultimaLon = lon;
         if(marker) map.removeLayer(marker);
@@ -132,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             map = L.map('mapa').setView([-34.8960, -54.9180], 15);
             capaOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
             capaOSM.addTo(map);
-            capaPlano = L.imageOverlay('plano_kennedy.png', limitesPlano, {
+            capaPlano = L.imageOverlay('plano_kennedy.jpg', limitesPlano, {
                 opacity: 1, 
                 interactive: false 
             });
@@ -183,8 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         datalist.innerHTML = '';
 
         if (ciDigitada.length >= 3) {
-            const { data } = await db.from('personas').select('documento_identidad, nombre, apellido, alias, telefono, observaciones_seguridad, padron_asociado, servicios_basicos, composicion_familiar, menores_estudiando, tiene_antecedentes, arresto_domiciliario, arresto_horario, vehiculos').ilike('documento_identidad', `${ciDigitada}%`).limit(5);
-            
+            const { data } = await db.from('personas').select('*').ilike('documento_identidad', `${ciDigitada}%`).limit(5);
             if (data) {
                 data.forEach(p => {
                     const option = document.createElement('option');
@@ -202,7 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('censo-padron-manual').value = coincidenciaExacta.padron_asociado || '';
                     document.getElementById('censo-familia').value = coincidenciaExacta.composicion_familiar || '';
                     document.getElementById('censo-vehiculos').value = coincidenciaExacta.vehiculos || '';
-                    
                     document.getElementById('censo-antecedentes').checked = coincidenciaExacta.tiene_antecedentes || false;
                     document.getElementById('c-estudios').checked = coincidenciaExacta.menores_estudiando || false;
                     
@@ -211,11 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('c-agua').checked = coincidenciaExacta.servicios_basicos.includes('Agua');
                         document.getElementById('c-net').checked = coincidenciaExacta.servicios_basicos.includes('Net');
                     }
-                    
                     if(coincidenciaExacta.observaciones_seguridad) {
                         document.getElementById('c-mides').checked = coincidenciaExacta.observaciones_seguridad.includes('[BENEFICIARIO MIDES/IDM]');
                     }
-
                     document.getElementById('censo-arresto').value = coincidenciaExacta.arresto_domiciliario || 'No';
                     if (coincidenciaExacta.arresto_domiciliario === 'Parcial') {
                         document.getElementById('censo-arresto-horario').style.display = 'block';
@@ -228,7 +218,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- RELEVAMIENTO PLAN +BARRIO Y OPERATIVO ---
     document.getElementById('btn-censar').addEventListener('click', () => document.getElementById('modal-censo').style.display = 'flex');
     document.getElementById('btn-cancelar-censo').addEventListener('click', () => document.getElementById('modal-censo').style.display = 'none');
 
@@ -283,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (error) alert("Error: " + error.message);
         else {
-            registrarLog(`GUARDADO/ACTUALIZACIÓN - CI: ${ci}`, 'personas'); // Registro de Auditoría
+            registrarLog(`GUARDADO/ACTUALIZACIÓN - CI: ${ci}`, 'personas');
             alert("Registro procesado correctamente. Vulnerabilidad: " + (esVulnerable ? "ALTA ⚠️" : "BAJA ✅"));
             document.getElementById('modal-censo').style.display = 'none';
             
@@ -296,7 +285,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerText = "Guardar Datos";
     });
 
-    // --- CONSULTAS Y MODIFICACIÓN AVANZADA ---
     document.getElementById('btn-ejecutar-busqueda').addEventListener('click', async () => {
         const tipo = document.getElementById('search-tipo').value;
         const valor = document.getElementById('search-valor').value.trim();
@@ -304,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if(!valor) return;
         contenedor.innerHTML = "<p>Consultando base de inteligencia...</p>";
-        registrarLog(`BÚSQUEDA TÁCTICA: ${tipo} = ${valor}`, 'personas'); // Registro de Auditoría
+        registrarLog(`BÚSQUEDA TÁCTICA: ${tipo} = ${valor}`, 'personas');
         
         let query = db.from('personas').select('*');
 
@@ -344,9 +332,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="display: flex; gap: 10px; margin-top: 15px;">
                         <button class="btn-mapa" style="flex:1; background: var(--azul-ministerio); color: white; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">📍 Ver en Mapa</button>
                         <button class="btn-editar" style="flex:1; background: #ffc107; color: black; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">✏️ Modificar</button>
+                        <button class="btn-pdf" style="flex:1; background: #dc3545; color: white; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">📄 PDF</button>
                     </div>
                 `;
                 
+                // Botón: Ver en mapa
                 ficha.querySelector('.btn-mapa').addEventListener('click', () => {
                     if (p.lat && p.lon) {
                         cambiarVista('app');
@@ -361,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
+                // Botón: Modificar
                 ficha.querySelector('.btn-editar').addEventListener('click', () => {
                     cambiarVista('app');
                     document.getElementById('censo-ci').value = p.documento_identidad || '';
@@ -394,12 +385,77 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('modal-censo').style.display = 'flex';
                 });
 
+                // Botón: Generar PDF Oficial
+                ficha.querySelector('.btn-pdf').addEventListener('click', () => {
+                    const btn = ficha.querySelector('.btn-pdf');
+                    btn.innerText = "⏳ Generando...";
+                    
+                    // Creamos una plantilla HTML "invisible" con formato oficial
+                    const plantillaPDF = document.createElement('div');
+                    plantillaPDF.style.padding = '40px';
+                    plantillaPDF.style.fontFamily = 'Arial, sans-serif';
+                    plantillaPDF.innerHTML = `
+                        <div style="text-align:center; border-bottom: 3px solid #002855; padding-bottom: 15px; margin-bottom: 25px;">
+                            <h2 style="color: #002855; margin: 0; text-transform: uppercase;">REPORTE DE INTELIGENCIA TERRITORIAL</h2>
+                            <h3 style="margin: 5px 0; color: #333;">Sistema V.I.G.I.A. - Zona Operacional II</h3>
+                            <p style="font-size: 0.85rem; color: #666; margin-top:10px;">Fecha de extracción: ${new Date().toLocaleString('es-UY')} <br> Operador Responsable: ${usuarioLogueado}</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">1. DATOS PERSONALES</h3>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Nombres y Apellidos:</b> ${p.nombre} ${p.apellido}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Cédula de Identidad:</b> ${p.documento_identidad}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Alias Conocido:</b> ${p.alias || 'Sin registrar'}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Teléfono de Contacto:</b> ${p.telefono || 'Sin registrar'}</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">2. UBICACIÓN TERRITORIAL</h3>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Padrón / Vivienda:</b> ${p.padron_asociado}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Georreferencia (Calle):</b> ${direccion}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Observaciones de Ubicación:</b> ${p.observaciones_seguridad || 'Ninguna'}</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">3. PERFIL DE INTELIGENCIA Y SEGURIDAD</h3>
+                            <p style="margin: 5px 0; font-size: 1rem; color: ${p.tiene_antecedentes ? '#dc3545' : '#000'};"><b>Antecedentes Penales:</b> ${p.tiene_antecedentes ? 'SÍ POSEE ANTECEDENTES' : 'NO REGISTRA'}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Situación de Arresto:</b> ${p.arresto_domiciliario !== 'No' ? p.arresto_domiciliario.toUpperCase() + (p.arresto_horario ? ' (Horario: ' + p.arresto_horario + ')' : '') : 'Sin restricciones activas'}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Vehículos Asociados:</b> ${p.vehiculos || 'Ninguno registrado'}</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">4. RELEVAMIENTO SOCIAL (PLAN +BARRIO)</h3>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Conexión a Servicios:</b> ${p.servicios_basicos || 'Carencia total'}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Nivel de Vulnerabilidad:</b> ${p.vulnerabilidad ? 'ALTO RIESGO / CARENCIAS CRÍTICAS' : 'ESTABLE'}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Núcleo Familiar:</b><br> ${p.composicion_familiar || 'Sin datos relevados'}</p>
+                        </div>
+                        
+                        <div style="margin-top: 40px; text-align: center; border-top: 1px dashed #ccc; padding-top: 20px;">
+                            <p style="font-size: 0.8rem; color: #888;">Documento generado automáticamente por el Sistema Táctico V.I.G.I.A.<br>Ministerio del Interior - Uruguay</p>
+                        </div>
+                    `;
+
+                    // Opciones de configuración del PDF
+                    const opcionesPDF = {
+                        margin: 10,
+                        filename: `Ficha_VIGIA_${p.documento_identidad}.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2 }, // Mejora la nitidez del texto
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    };
+
+                    // Ejecutar la librería
+                    html2pdf().set(opcionesPDF).from(plantillaPDF).save().then(() => {
+                        btn.innerText = "📄 PDF"; // Restaura el botón al terminar
+                        registrarLog(`EXPORTACIÓN A PDF - CI: ${p.documento_identidad}`, 'personas');
+                    });
+                });
+
                 contenedor.appendChild(ficha);
             }
         }
     });
 
-    // --- PANEL DE AUDITORÍA (ADMIN) ---
     document.getElementById('btn-admin-panel').addEventListener('click', async () => {
         cambiarVista('admin');
         const { data } = await db.from('logs_auditoria').select('*').order('fecha_hora', { ascending: false }).limit(50);
