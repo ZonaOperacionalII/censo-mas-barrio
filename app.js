@@ -18,8 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let ultimaLat = null;
     let ultimaLon = null;
 
-    // Coordenadas fijas para la imagen (no importa si no coinciden perfecto con el mundo real ahora)
-    const limitesPlano = [[-34.8960, -54.9270], [-34.9045, -54.9160]];
+    // Coordenadas ajustadas para la imagen VERTICAL (Norte hacia arriba - Av. Liber Seregni)
+    const limitesPlano = [[-34.8850, -54.9250], [-34.9080, -54.9120]];
 
     // --- FUNCIONES DE NAVEGACIÓN ---
     function cambiarVista(vistaDestino) {
@@ -112,13 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function iniciarApp() {
         cambiarVista('app');
         if (!map) {
-            map = L.map('mapa').setView([-34.9000, -54.9220], 15);
+            // Centro de cámara ajustado para la vista vertical
+            map = L.map('mapa').setView([-34.8960, -54.9180], 15);
             
             // Capa 1: Satélite / Calles normal
             capaOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
             capaOSM.addTo(map);
             
-            // Capa 2: La imagen en PNG (con opacidad 100% para verse perfecta sola)
+            // Capa 2: La imagen en JPG
             capaPlano = L.imageOverlay('plano_kennedy.png', limitesPlano, {
                 opacity: 1, 
                 interactive: false 
