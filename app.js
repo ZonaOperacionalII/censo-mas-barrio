@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             capaOSM.addTo(map);
             
             // Capa 2: La imagen en JPG
-            capaPlano = L.imageOverlay('plano_kennedy.png', limitesPlano, {
+            capaPlano = L.imageOverlay('plano_kennedy.jpg', limitesPlano, {
                 opacity: 1, 
                 interactive: false 
             });
@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerText = "Guardar Datos";
     });
 
-    // --- CONSULTAS Y CONSULTORÍA TÁCTICA AVANZADA ---
+    // --- CONSULTAS Y MODIFICACIÓN AVANZADA ---
     document.getElementById('btn-ejecutar-busqueda').addEventListener('click', async () => {
         const tipo = document.getElementById('search-tipo').value;
         const valor = document.getElementById('search-valor').value.trim();
@@ -330,13 +330,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="ficha-datos"><b>Vehículos:</b> ${p.vehiculos || 'Ninguno registrado'}</p>
                     <div class="ficha-obs"><b>Detalles de ubicación:</b><br>${p.observaciones_seguridad || ''}</div>
                     <div class="ficha-obs"><b>Composición de Familia:</b><br>${p.composicion_familiar || 'Sin datos de núcleo'}</div>
-                    <button class="btn-primario" style="margin-top:10px; padding:8px; font-size:0.9rem;">Ver Ubicación en Mapa</button>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button class="btn-mapa" style="flex:1; background: var(--azul-ministerio); color: white; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">📍 Ver en Mapa</button>
+                        <button class="btn-editar" style="flex:1; background: #ffc107; color: black; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">✏️ Modificar</button>
+                    </div>
                 `;
                 
-                ficha.querySelector('button').addEventListener('click', () => {
+                // Lógica Inteligente para el Mapa
+                ficha.querySelector('.btn-mapa').addEventListener('click', () => {
                     if (p.lat && p.lon) {
                         cambiarVista('app');
-                        if (modoPlanoActivo) document.getElementById('btn-modo-plano').click(); // Si estaba en el plano, lo saca para ver la calle real
+                        
+                        // Si el padrón dice REALOJO y el plano está apagado, lo enciende. Si es de la calle y el plano está prendido, lo apaga.
+                        const esZonaRealojo = p.padron_asociado && p.padron_asociado.toUpperCase().includes('REALOJO');
+                        if (esZonaRealojo && !modoPlanoActivo) document.getElementById('btn-modo-plano').click();
+                        else if (!esZonaRealojo && modoPlanoActivo) document.getElementById('btn-modo-plano').click();
+
                         map.setView([p.lat, p.lon], 18);
                         if(marker) map.removeLayer(marker);
                         marker = L.marker([p.lat, p.lon]).addTo(map).bindPopup(`<b>${p.nombre} ${p.apellido}</b><br>${direccion}`).openPopup();
@@ -344,6 +353,48 @@ document.addEventListener('DOMContentLoaded', () => {
                         alert("Este censo histórico no cuenta con coordenadas GPS.");
                     }
                 });
+
+                // Lógica para Modificar Datos directamente desde la búsqueda
+                ficha.querySelector('.btn-editar').addEventListener('click', () => {
+                    cambiarVista('app');
+                    
+                    document.getElementById('censo-ci').value = p.documento_identidad || '';
+                    document.getElementById('censo-nombre').value = p.nombre || '';
+                    document.getElementById('censo-apellido').value = p.apellido || '';
+                    document.getElementById('censo-alias').value = p.alias || '';
+                    document.getElementById('censo-telefono').value = p.telefono || '';
+                    document.getElementById('censo-padron-manual').value = p.padron_asociado || '';
+                    document.getElementById('censo-familia').value = p.composicion_familiar || '';
+                    document.getElementById('censo-vehiculos').value = p.vehiculos || '';
+                    
+                    document.getElementById('censo-antecedentes').checked = p.tiene_antecedentes || false;
+                    document.getElementById('c-estudios').checked = p.menores_estudiando || false;
+                    
+                    if(p.servicios_basicos) {
+                        document.getElementById('c-luz').checked = p.servicios_basicos.includes('Luz');
+                        document.getElementById('c-agua').checked = p.servicios_basicos.includes('Agua');
+                        document.getElementById('c-net').checked = p.servicios_basicos.includes('Net');
+                    }
+                    
+                    if(p.observaciones_seguridad) {
+                        document.getElementById('c-mides').checked = p.observaciones_seguridad.includes('[BENEFICIARIO MIDES/IDM]');
+                    }
+
+                    document.getElementById('censo-arresto').value = p.arresto_domiciliario || 'No';
+                    if (p.arresto_domiciliario === 'Parcial') {
+                        document.getElementById('censo-arresto-horario').style.display = 'block';
+                        document.getElementById('censo-arresto-horario').value = p.arresto_horario || '';
+                    } else {
+                        document.getElementById('censo-arresto-horario').style.display = 'none';
+                    }
+
+                    ultimaLat = p.lat;
+                    ultimaLon = p.lon;
+                    padronUbicacionActual = p.padron_asociado;
+
+                    document.getElementById('modal-censo').style.display = 'flex';
+                });
+
                 contenedor.appendChild(ficha);
             }
         }
