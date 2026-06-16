@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             map = L.map('mapa').setView([-34.8960, -54.9180], 15);
             capaOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
             capaOSM.addTo(map);
-            capaPlano = L.imageOverlay('plano_kennedy.jpg', limitesPlano, {
+            capaPlano = L.imageOverlay('plano_kennedy.png', limitesPlano, {
                 opacity: 1, 
                 interactive: false 
             });
