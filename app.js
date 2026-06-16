@@ -17,8 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let padronUbicacionActual = "Desconocido";
     let ultimaLat = null;
     let ultimaLon = null;
+    let usuarioLogueado = "Desconocido"; // Variable para el Log de Auditoría
 
-    // Coordenadas ajustadas para la imagen VERTICAL (Norte hacia arriba - Av. Liber Seregni)
+    // Coordenadas ajustadas para la imagen VERTICAL (Norte hacia arriba)
     const limitesPlano = [[-34.8850, -54.9250], [-34.9080, -54.9120]];
 
     // --- FUNCIONES DE NAVEGACIÓN ---
@@ -30,13 +31,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('logo-principal').addEventListener('click', () => cambiarVista('app'));
 
+    // --- SISTEMA DE AUDITORÍA (TRACKER) ---
+    async function registrarLog(accion, tabla) {
+        if (usuarioLogueado === "Desconocido") return;
+        await db.from('logs_auditoria').insert([{
+            usuario_ci: usuarioLogueado,
+            accion: accion,
+            tabla_afectada: tabla
+        }]);
+    }
+
     // --- SEGURIDAD ---
     async function checkSession() {
         const { data: { session } } = await db.auth.getSession();
-        if (session) validarRol(session.user.email);
+        if (session) {
+            validarRol(session.user.email);
+            registrarLog('INICIO DE SESIÓN / APERTURA DE APP', 'Sistema');
+        }
     }
     
     async function validarRol(email) {
+        usuarioLogueado = email;
         const headerUser = document.getElementById('header-user');
         if(headerUser) headerUser.innerText = `Usuario: ${email}`;
 
@@ -60,10 +75,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             document.getElementById('login-error').style.display = 'none';
             validarRol(e);
+            registrarLog('INICIO DE SESIÓN MANUAL', 'Sistema');
         }
     });
 
     document.getElementById('btn-logout').addEventListener('click', async () => {
+        registrarLog('CIERRE DE SESIÓN', 'Sistema');
         await db.auth.signOut();
         location.reload();
     });
@@ -112,38 +129,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function iniciarApp() {
         cambiarVista('app');
         if (!map) {
-            // Centro de cámara ajustado para la vista vertical
             map = L.map('mapa').setView([-34.8960, -54.9180], 15);
-            
-            // Capa 1: Satélite / Calles normal
             capaOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
             capaOSM.addTo(map);
-            
-            // Capa 2: La imagen en JPG
-            capaPlano = L.imageOverlay('plano_kennedy.png', limitesPlano, {
+            capaPlano = L.imageOverlay('plano_kennedy.jpg', limitesPlano, {
                 opacity: 1, 
                 interactive: false 
             });
-
             map.on('click', (e) => procesarUbicacion(e.latlng.lat, e.latlng.lng));
         }
     }
 
-    // LÓGICA DEL BOTÓN ALTERNAR MAPA/PLANO
     document.getElementById('btn-modo-plano').addEventListener('click', () => {
         modoPlanoActivo = !modoPlanoActivo;
         const btn = document.getElementById('btn-modo-plano');
         
         if (modoPlanoActivo) {
-            map.removeLayer(capaOSM); // Apagamos el mundo real
-            capaPlano.addTo(map);     // Encendemos el dibujo
-            map.fitBounds(limitesPlano); // Zoom automático al barrio
+            map.removeLayer(capaOSM);
+            capaPlano.addTo(map);
+            map.fitBounds(limitesPlano);
             btn.innerText = "🌍 Volver a Mapa GPS";
             btn.style.background = "#6c757d";
             document.getElementById('resultado-padron').innerText = "🗺️ Modo Plano Activo. Toque un lote.";
         } else {
-            map.removeLayer(capaPlano); // Apagamos el dibujo
-            capaOSM.addTo(map);         // Encendemos el mundo real
+            map.removeLayer(capaPlano);
+            capaOSM.addTo(map);
             btn.innerText = "🗺️ Ver Plano Realojo";
             btn.style.background = "#17a2b8";
         }
@@ -167,7 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-censar').style.display = 'block';
     });
 
-    // --- BUSCADOR / AUTOCOMPLETADO DE CÉDULAS EN TIEMPO REAL ---
     document.getElementById('censo-ci').addEventListener('input', async (e) => {
         const ciDigitada = e.target.value.trim();
         const datalist = document.getElementById('cedulas-sugeridas');
@@ -274,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (error) alert("Error: " + error.message);
         else {
+            registrarLog(`GUARDADO/ACTUALIZACIÓN - CI: ${ci}`, 'personas'); // Registro de Auditoría
             alert("Registro procesado correctamente. Vulnerabilidad: " + (esVulnerable ? "ALTA ⚠️" : "BAJA ✅"));
             document.getElementById('modal-censo').style.display = 'none';
             
@@ -294,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if(!valor) return;
         contenedor.innerHTML = "<p>Consultando base de inteligencia...</p>";
+        registrarLog(`BÚSQUEDA TÁCTICA: ${tipo} = ${valor}`, 'personas'); // Registro de Auditoría
         
         let query = db.from('personas').select('*');
 
@@ -336,16 +347,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
                 
-                // Lógica Inteligente para el Mapa
                 ficha.querySelector('.btn-mapa').addEventListener('click', () => {
                     if (p.lat && p.lon) {
                         cambiarVista('app');
-                        
-                        // Si el padrón dice REALOJO y el plano está apagado, lo enciende. Si es de la calle y el plano está prendido, lo apaga.
                         const esZonaRealojo = p.padron_asociado && p.padron_asociado.toUpperCase().includes('REALOJO');
                         if (esZonaRealojo && !modoPlanoActivo) document.getElementById('btn-modo-plano').click();
                         else if (!esZonaRealojo && modoPlanoActivo) document.getElementById('btn-modo-plano').click();
-
                         map.setView([p.lat, p.lon], 18);
                         if(marker) map.removeLayer(marker);
                         marker = L.marker([p.lat, p.lon]).addTo(map).bindPopup(`<b>${p.nombre} ${p.apellido}</b><br>${direccion}`).openPopup();
@@ -354,10 +361,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Lógica para Modificar Datos directamente desde la búsqueda
                 ficha.querySelector('.btn-editar').addEventListener('click', () => {
                     cambiarVista('app');
-                    
                     document.getElementById('censo-ci').value = p.documento_identidad || '';
                     document.getElementById('censo-nombre').value = p.nombre || '';
                     document.getElementById('censo-apellido').value = p.apellido || '';
@@ -366,20 +371,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('censo-padron-manual').value = p.padron_asociado || '';
                     document.getElementById('censo-familia').value = p.composicion_familiar || '';
                     document.getElementById('censo-vehiculos').value = p.vehiculos || '';
-                    
                     document.getElementById('censo-antecedentes').checked = p.tiene_antecedentes || false;
                     document.getElementById('c-estudios').checked = p.menores_estudiando || false;
-                    
                     if(p.servicios_basicos) {
                         document.getElementById('c-luz').checked = p.servicios_basicos.includes('Luz');
                         document.getElementById('c-agua').checked = p.servicios_basicos.includes('Agua');
                         document.getElementById('c-net').checked = p.servicios_basicos.includes('Net');
                     }
-                    
                     if(p.observaciones_seguridad) {
                         document.getElementById('c-mides').checked = p.observaciones_seguridad.includes('[BENEFICIARIO MIDES/IDM]');
                     }
-
                     document.getElementById('censo-arresto').value = p.arresto_domiciliario || 'No';
                     if (p.arresto_domiciliario === 'Parcial') {
                         document.getElementById('censo-arresto-horario').style.display = 'block';
@@ -387,11 +388,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         document.getElementById('censo-arresto-horario').style.display = 'none';
                     }
-
                     ultimaLat = p.lat;
                     ultimaLon = p.lon;
                     padronUbicacionActual = p.padron_asociado;
-
                     document.getElementById('modal-censo').style.display = 'flex';
                 });
 
@@ -403,14 +402,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- PANEL DE AUDITORÍA (ADMIN) ---
     document.getElementById('btn-admin-panel').addEventListener('click', async () => {
         cambiarVista('admin');
-        const { data } = await db.from('logs_auditoria').select('*').order('fecha_hora', { ascending: false }).limit(30);
+        const { data } = await db.from('logs_auditoria').select('*').order('fecha_hora', { ascending: false }).limit(50);
         const tabla = document.getElementById('tabla-logs');
         tabla.innerHTML = '';
         if(data) data.forEach(l => {
             tabla.innerHTML += `<tr>
-                <td style="padding:10px; border-bottom:1px solid #ddd;">${new Date(l.fecha_hora).toLocaleDateString('es-UY')}</td>
-                <td style="border-bottom:1px solid #ddd; font-weight:bold;">${l.usuario_ci}</td>
-                <td style="border-bottom:1px solid #ddd; font-size:0.8rem;">${l.accion} en ${l.tabla_afectada}</td>
+                <td style="padding:10px; border-bottom:1px solid #ddd; font-size:0.8rem;">${new Date(l.fecha_hora).toLocaleString('es-UY')}</td>
+                <td style="border-bottom:1px solid #ddd; font-weight:bold; font-size:0.85rem;">${l.usuario_ci.split('@')[0]}</td>
+                <td style="border-bottom:1px solid #ddd; font-size:0.8rem;">${l.accion}</td>
             </tr>`;
         });
     });
