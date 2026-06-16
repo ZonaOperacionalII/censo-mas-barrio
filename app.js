@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             capaOSM.addTo(map);
             
             // Capa 2: La imagen en JPG
-            capaPlano = L.imageOverlay('plano_kennedy.jpg', limitesPlano, {
+            capaPlano = L.imageOverlay('plano_kennedy.png', limitesPlano, {
                 opacity: 1, 
                 interactive: false 
             });
