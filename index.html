@@ -117,13 +117,26 @@
         <div id="contenedor-resultados"></div>
     </div>
 
-    <div id="admin-view" style="padding: 20px; overflow-y: auto;">
+    <div id="admin-view" style="background: var(--gris-fondo); padding: 20px; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="color: var(--azul-ministerio); margin: 0;">Log Operativo</h2>
+            <h2 style="color: var(--azul-ministerio); margin: 0;">Panel de Mando Táctico</h2>
             <button id="btn-cerrar-admin" class="btn-accion">Volver</button>
         </div>
-        <table style="width: 100%; text-align: left; background: white; border-collapse: collapse;">
-            <thead><tr style="background:#eee; border-bottom:2px solid var(--azul-ministerio);"><th>Fecha</th><th>Usuario</th><th>Acción</th></tr></thead>
+
+        <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <h3 style="margin-top: 0; font-size: 1rem; color: var(--azul-ministerio);">Índice de Vulnerabilidad</h3>
+                <canvas id="graficoVulnerabilidad" height="200"></canvas>
+            </div>
+            <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <h3 style="margin-top: 0; font-size: 1rem; color: var(--azul-ministerio);">Conexión a Servicios</h3>
+                <canvas id="graficoServicios" height="200"></canvas>
+            </div>
+        </div>
+
+        <h3 style="color: var(--azul-ministerio); margin-bottom: 10px;">Auditoría de Operaciones</h3>
+        <table style="width: 100%; text-align: left; background: white; border-collapse: collapse; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+            <thead><tr style="background:#002855; color: white; border-bottom:2px solid var(--azul-ministerio);"><th style="padding:10px;">Fecha</th><th style="padding:10px;">Usuario</th><th style="padding:10px;">Acción</th></tr></thead>
             <tbody id="tabla-logs"></tbody>
         </table>
     </div>
@@ -140,11 +153,13 @@
             </div>
 
             <div class="seccion-titulo">TITULAR RESPONSABLE</div>
-            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-                <input type="text" id="censo-ci" class="input-mini" placeholder="Cédula" list="cedulas-sugeridas" autocomplete="off">
+            <div style="display: flex; gap: 5px; margin-bottom: 5px; position: relative;">
+                <input type="text" id="censo-ci" class="input-mini" placeholder="Cédula (Sin guiones)" list="cedulas-sugeridas" autocomplete="off" maxlength="8">
                 <datalist id="cedulas-sugeridas"></datalist>
                 <input type="text" id="censo-alias" class="input-mini" placeholder="Alias">
             </div>
+            <p id="ci-alerta" style="display: none; color: #dc3545; font-size: 0.75rem; font-weight: bold; margin: -5px 0 5px 0; background: #ffcccc; padding: 3px 6px; border-radius: 3px;">⚠️ Cédula Inválida (Revise los números)</p>
+            
             <div style="display: flex; gap: 5px; margin-bottom: 5px;">
                 <input type="text" id="censo-nombre" class="input-mini" placeholder="Nombre">
                 <input type="text" id="censo-apellido" class="input-mini" placeholder="Apellido">
@@ -197,11 +212,10 @@
         </div>
     </div>
 
-    <!-- LIBRERÍAS EXTERNAS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Librería para generar el PDF Oficial -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
