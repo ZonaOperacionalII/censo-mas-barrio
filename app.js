@@ -18,11 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let ultimaLat = null;
     let ultimaLon = null;
     let usuarioLogueado = "Desconocido";
-    let chartVuln, chartServ; // Variables para los gráficos
+    let chartVuln, chartServ; 
 
     const limitesPlano = [[-34.8850, -54.9250], [-34.9080, -54.9120]];
 
-    // --- FUNCIONES DE NAVEGACIÓN ---
     function cambiarVista(vistaDestino) {
         Object.values(views).forEach(v => v.style.display = 'none');
         views[vistaDestino].style.display = 'flex';
@@ -31,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('logo-principal').addEventListener('click', () => cambiarVista('app'));
 
-    // --- SISTEMA DE AUDITORÍA (TRACKER) ---
     async function registrarLog(accion, tabla) {
         if (usuarioLogueado === "Desconocido") return;
         await db.from('logs_auditoria').insert([{
@@ -41,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }]);
     }
 
-    // --- SEGURIDAD ---
     async function checkSession() {
         const { data: { session } } = await db.auth.getSession();
         if (session) {
@@ -62,11 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
         iniciarApp();
     }
 
-    // --- ALGORITMO DE VALIDACIÓN DE CÉDULA URUGUAYA ---
-    function validarCedulaUruguaya(ci) {
-        let ciNum = ci.replace(/\D/g, ''); // Quita guiones o letras
+    // --- ALGORITMO MATEMÁTICO DE VALIDACIÓN DE CÉDULA URUGUAYA ---
+    function validarCedulaUruguaya(ciNum) {
         if (ciNum.length < 7 || ciNum.length > 8) return false;
-        if (ciNum.length === 7) ciNum = '0' + ciNum; // Rellena con 0 si es antigua
+        if (ciNum.length === 7) ciNum = '0' + ciNum; 
         
         const coeficientes = [2, 9, 8, 7, 6, 3, 4];
         let suma = 0;
@@ -77,7 +73,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return digitoVerificador === parseInt(ciNum[7]);
     }
 
-    // --- PANEL DE MANDO / ESTADÍSTICAS ---
+    // Función que evalúa si debe prender la alerta o dejar guardar
+    function validarInputCedula() {
+        const ciDigitada = document.getElementById('censo-ci').value.trim();
+        const esExtranjero = document.getElementById('censo-extranjero').checked;
+        const alertaCI = document.getElementById('ci-alerta');
+        const btnGuardar = document.getElementById('btn-guardar-censo');
+
+        // Si es extranjero o no ha terminado de tipear al menos 7 números, apagamos la alerta roja
+        if (esExtranjero || ciDigitada.length < 7) {
+            alertaCI.style.display = 'none';
+            btnGuardar.disabled = false;
+            btnGuardar.style.opacity = '1';
+            return;
+        }
+
+        const ciLimpia = ciDigitada.replace(/\D/g, '');
+        if (!validarCedulaUruguaya(ciLimpia)) {
+            alertaCI.style.display = 'block';
+            btnGuardar.disabled = true;
+            btnGuardar.style.opacity = '0.5';
+        } else {
+            alertaCI.style.display = 'none';
+            btnGuardar.disabled = false;
+            btnGuardar.style.opacity = '1';
+        }
+    }
+
+    // --- PANEL DE ESTADÍSTICAS ---
     async function cargarDashboard() {
         const { data, error } = await db.from('personas').select('vulnerabilidad, servicios_basicos');
         if (error || !data) return;
@@ -96,11 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Destruimos gráficos viejos para no encimarlos si entra varias veces al menú
         if (chartVuln) chartVuln.destroy();
         if (chartServ) chartServ.destroy();
 
-        // Gráfico de Vulnerabilidad (Doughnut)
         const ctxVuln = document.getElementById('graficoVulnerabilidad').getContext('2d');
         chartVuln = new Chart(ctxVuln, {
             type: 'doughnut',
@@ -113,7 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Gráfico de Servicios (Barras)
         const ctxServ = document.getElementById('graficoServicios').getContext('2d');
         chartServ = new Chart(ctxServ, {
             type: 'bar',
@@ -129,7 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- LISTENERS DE SESIÓN Y VISTAS ---
     document.getElementById('btn-login').addEventListener('click', async () => {
         const e = document.getElementById('doc').value;
         const p = document.getElementById('pass').value;
@@ -243,34 +262,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-censar').style.display = 'block';
     });
 
-    // --- AUTCOMPLETADO Y VALIDACIÓN EN TIEMPO REAL ---
+    // Detectar cambios en la casilla de Extranjero para reevaluar la validación
+    document.getElementById('censo-extranjero').addEventListener('change', validarInputCedula);
+
     document.getElementById('censo-ci').addEventListener('input', async (e) => {
         const ciDigitada = e.target.value.trim();
         const datalist = document.getElementById('cedulas-sugeridas');
         datalist.innerHTML = '';
         
-        const alertaCI = document.getElementById('ci-alerta');
-        const btnGuardar = document.getElementById('btn-guardar-censo');
+        validarInputCedula();
 
-        // Control de Cédula Matemática
-        const ciLimpia = ciDigitada.replace(/\D/g, '');
-        if (ciLimpia.length >= 7) {
-            if (!validarCedulaUruguaya(ciLimpia)) {
-                alertaCI.style.display = 'block';
-                btnGuardar.disabled = true;
-                btnGuardar.style.opacity = '0.5';
-            } else {
-                alertaCI.style.display = 'none';
-                btnGuardar.disabled = false;
-                btnGuardar.style.opacity = '1';
-            }
-        } else {
-            alertaCI.style.display = 'none';
-            btnGuardar.disabled = false;
-            btnGuardar.style.opacity = '1';
-        }
-
-        // Autocompletado de la base
         if (ciDigitada.length >= 3) {
             const { data } = await db.from('personas').select('*').ilike('documento_identidad', `${ciDigitada}%`).limit(5);
             if (data) {
@@ -308,6 +309,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         document.getElementById('censo-arresto-horario').style.display = 'none';
                     }
+
+                    // Si se autocompleta un registro que no es cédula uruguaya, marca la casilla automáticamente
+                    if (!validarCedulaUruguaya(coincidenciaExacta.documento_identidad.replace(/\D/g, ''))) {
+                        document.getElementById('censo-extranjero').checked = true;
+                    } else {
+                        document.getElementById('censo-extranjero').checked = false;
+                    }
+                    validarInputCedula();
                 }
             }
         }
@@ -315,12 +324,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-censar').addEventListener('click', () => {
         document.getElementById('modal-censo').style.display = 'flex';
-        // Limpiamos alertas visuales previas
         document.getElementById('ci-alerta').style.display = 'none';
         document.getElementById('btn-guardar-censo').disabled = false;
         document.getElementById('btn-guardar-censo').style.opacity = '1';
     });
-    
+
     document.getElementById('btn-cancelar-censo').addEventListener('click', () => document.getElementById('modal-censo').style.display = 'none');
 
     document.getElementById('btn-guardar-censo').addEventListener('click', async () => {
@@ -380,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const camposLimpiar = ['censo-ci','censo-nombre','censo-apellido','censo-alias','censo-telefono','censo-padron-manual','censo-manzana','censo-vivienda', 'censo-familia', 'censo-vehiculos', 'censo-arresto-horario'];
             camposLimpiar.forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
-            ['c-luz', 'c-agua', 'c-net', 'c-mides', 'c-estudios', 'censo-antecedentes'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).checked = false; });
+            ['c-luz', 'c-agua', 'c-net', 'c-mides', 'c-estudios', 'censo-antecedentes', 'censo-extranjero'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).checked = false; });
             document.getElementById('censo-arresto').value = "No";
             document.getElementById('censo-arresto-horario').style.display = 'none';
         }
@@ -424,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ficha.innerHTML = `
                     <div class="ficha-ubicacion">📍 Padrón: ${p.padron_asociado} - ${direccion}</div>
                     <h4 class="ficha-nombre">${p.nombre} ${p.apellido} ${p.alias ? `("${p.alias}")` : ''}</h4>
-                    <p class="ficha-datos"><b>C.I:</b> ${p.documento_identidad} | <b>Tel:</b> ${p.telefono || 'Sin registrar'}</p>
+                    <p class="ficha-datos"><b>C.I/Pasaporte:</b> ${p.documento_identidad} | <b>Tel:</b> ${p.telefono || 'Sin registrar'}</p>
                     <p class="ficha-datos"><b>Estado:</b> ${alertaVuln} ${alertaAnt}</p>
                     ${alertaArresto}
                     <p class="ficha-datos" style="margin-top:8px;"><b>Servicios:</b> ${p.servicios_basicos || 'Ninguno'}</p>
@@ -483,9 +491,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     ultimaLon = p.lon;
                     padronUbicacionActual = p.padron_asociado;
                     
-                    document.getElementById('ci-alerta').style.display = 'none';
-                    document.getElementById('btn-guardar-censo').disabled = false;
-                    document.getElementById('btn-guardar-censo').style.opacity = '1';
+                    if (!validarCedulaUruguaya(p.documento_identidad.replace(/\D/g, ''))) {
+                        document.getElementById('censo-extranjero').checked = true;
+                    } else {
+                        document.getElementById('censo-extranjero').checked = false;
+                    }
+                    validarInputCedula();
 
                     document.getElementById('modal-censo').style.display = 'flex';
                 });
@@ -506,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="margin-bottom: 20px;">
                             <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">1. DATOS PERSONALES</h3>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Nombres y Apellidos:</b> ${p.nombre} ${p.apellido}</p>
-                            <p style="margin: 5px 0; font-size: 1rem;"><b>Cédula de Identidad:</b> ${p.documento_identidad}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Cédula/Doc:</b> ${p.documento_identidad}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Alias Conocido:</b> ${p.alias || 'Sin registrar'}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Teléfono de Contacto:</b> ${p.telefono || 'Sin registrar'}</p>
                         </div>
@@ -554,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-admin-panel').addEventListener('click', async () => {
         cambiarVista('admin');
-        await cargarDashboard(); // Carga los gráficos antes de mostrar la tabla
+        await cargarDashboard(); 
         
         const { data } = await db.from('logs_auditoria').select('*').order('fecha_hora', { ascending: false }).limit(50);
         const tabla = document.getElementById('tabla-logs');
