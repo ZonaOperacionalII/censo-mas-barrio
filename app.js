@@ -18,9 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let ultimaLat = null;
     let ultimaLon = null;
     let usuarioLogueado = "Desconocido";
+    let chartVuln, chartServ; // Variables para los gráficos
 
     const limitesPlano = [[-34.8850, -54.9250], [-34.9080, -54.9120]];
 
+    // --- FUNCIONES DE NAVEGACIÓN ---
     function cambiarVista(vistaDestino) {
         Object.values(views).forEach(v => v.style.display = 'none');
         views[vistaDestino].style.display = 'flex';
@@ -29,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('logo-principal').addEventListener('click', () => cambiarVista('app'));
 
+    // --- SISTEMA DE AUDITORÍA (TRACKER) ---
     async function registrarLog(accion, tabla) {
         if (usuarioLogueado === "Desconocido") return;
         await db.from('logs_auditoria').insert([{
@@ -38,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }]);
     }
 
+    // --- SEGURIDAD ---
     async function checkSession() {
         const { data: { session } } = await db.auth.getSession();
         if (session) {
@@ -58,6 +62,74 @@ document.addEventListener('DOMContentLoaded', () => {
         iniciarApp();
     }
 
+    // --- ALGORITMO DE VALIDACIÓN DE CÉDULA URUGUAYA ---
+    function validarCedulaUruguaya(ci) {
+        let ciNum = ci.replace(/\D/g, ''); // Quita guiones o letras
+        if (ciNum.length < 7 || ciNum.length > 8) return false;
+        if (ciNum.length === 7) ciNum = '0' + ciNum; // Rellena con 0 si es antigua
+        
+        const coeficientes = [2, 9, 8, 7, 6, 3, 4];
+        let suma = 0;
+        for (let i = 0; i < 7; i++) {
+            suma += parseInt(ciNum[i]) * coeficientes[i];
+        }
+        let digitoVerificador = (10 - (suma % 10)) % 10;
+        return digitoVerificador === parseInt(ciNum[7]);
+    }
+
+    // --- PANEL DE MANDO / ESTADÍSTICAS ---
+    async function cargarDashboard() {
+        const { data, error } = await db.from('personas').select('vulnerabilidad, servicios_basicos');
+        if (error || !data) return;
+
+        let vulnAlta = 0, vulnBaja = 0;
+        let conLuz = 0, conAgua = 0, conNet = 0;
+
+        data.forEach(p => {
+            if (p.vulnerabilidad) vulnAlta++;
+            else vulnBaja++;
+
+            if (p.servicios_basicos) {
+                if (p.servicios_basicos.includes('Luz')) conLuz++;
+                if (p.servicios_basicos.includes('Agua')) conAgua++;
+                if (p.servicios_basicos.includes('Net')) conNet++;
+            }
+        });
+
+        // Destruimos gráficos viejos para no encimarlos si entra varias veces al menú
+        if (chartVuln) chartVuln.destroy();
+        if (chartServ) chartServ.destroy();
+
+        // Gráfico de Vulnerabilidad (Doughnut)
+        const ctxVuln = document.getElementById('graficoVulnerabilidad').getContext('2d');
+        chartVuln = new Chart(ctxVuln, {
+            type: 'doughnut',
+            data: {
+                labels: ['Vulnerabilidad Alta', 'Entorno Estable'],
+                datasets: [{
+                    data: [vulnAlta, vulnBaja],
+                    backgroundColor: ['#dc3545', '#28a745']
+                }]
+            }
+        });
+
+        // Gráfico de Servicios (Barras)
+        const ctxServ = document.getElementById('graficoServicios').getContext('2d');
+        chartServ = new Chart(ctxServ, {
+            type: 'bar',
+            data: {
+                labels: ['Luz', 'Agua', 'Internet'],
+                datasets: [{
+                    label: 'Viviendas conectadas',
+                    data: [conLuz, conAgua, conNet],
+                    backgroundColor: '#17a2b8'
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true } } }
+        });
+    }
+
+    // --- LISTENERS DE SESIÓN Y VISTAS ---
     document.getElementById('btn-login').addEventListener('click', async () => {
         const e = document.getElementById('doc').value;
         const p = document.getElementById('pass').value;
@@ -171,11 +243,34 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-censar').style.display = 'block';
     });
 
+    // --- AUTCOMPLETADO Y VALIDACIÓN EN TIEMPO REAL ---
     document.getElementById('censo-ci').addEventListener('input', async (e) => {
         const ciDigitada = e.target.value.trim();
         const datalist = document.getElementById('cedulas-sugeridas');
         datalist.innerHTML = '';
+        
+        const alertaCI = document.getElementById('ci-alerta');
+        const btnGuardar = document.getElementById('btn-guardar-censo');
 
+        // Control de Cédula Matemática
+        const ciLimpia = ciDigitada.replace(/\D/g, '');
+        if (ciLimpia.length >= 7) {
+            if (!validarCedulaUruguaya(ciLimpia)) {
+                alertaCI.style.display = 'block';
+                btnGuardar.disabled = true;
+                btnGuardar.style.opacity = '0.5';
+            } else {
+                alertaCI.style.display = 'none';
+                btnGuardar.disabled = false;
+                btnGuardar.style.opacity = '1';
+            }
+        } else {
+            alertaCI.style.display = 'none';
+            btnGuardar.disabled = false;
+            btnGuardar.style.opacity = '1';
+        }
+
+        // Autocompletado de la base
         if (ciDigitada.length >= 3) {
             const { data } = await db.from('personas').select('*').ilike('documento_identidad', `${ciDigitada}%`).limit(5);
             if (data) {
@@ -218,7 +313,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('btn-censar').addEventListener('click', () => document.getElementById('modal-censo').style.display = 'flex');
+    document.getElementById('btn-censar').addEventListener('click', () => {
+        document.getElementById('modal-censo').style.display = 'flex';
+        // Limpiamos alertas visuales previas
+        document.getElementById('ci-alerta').style.display = 'none';
+        document.getElementById('btn-guardar-censo').disabled = false;
+        document.getElementById('btn-guardar-censo').style.opacity = '1';
+    });
+    
     document.getElementById('btn-cancelar-censo').addEventListener('click', () => document.getElementById('modal-censo').style.display = 'none');
 
     document.getElementById('btn-guardar-censo').addEventListener('click', async () => {
@@ -336,7 +438,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
                 
-                // Botón: Ver en mapa
                 ficha.querySelector('.btn-mapa').addEventListener('click', () => {
                     if (p.lat && p.lon) {
                         cambiarVista('app');
@@ -351,7 +452,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Botón: Modificar
                 ficha.querySelector('.btn-editar').addEventListener('click', () => {
                     cambiarVista('app');
                     document.getElementById('censo-ci').value = p.documento_identidad || '';
@@ -382,15 +482,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     ultimaLat = p.lat;
                     ultimaLon = p.lon;
                     padronUbicacionActual = p.padron_asociado;
+                    
+                    document.getElementById('ci-alerta').style.display = 'none';
+                    document.getElementById('btn-guardar-censo').disabled = false;
+                    document.getElementById('btn-guardar-censo').style.opacity = '1';
+
                     document.getElementById('modal-censo').style.display = 'flex';
                 });
 
-                // Botón: Generar PDF Oficial
                 ficha.querySelector('.btn-pdf').addEventListener('click', () => {
                     const btn = ficha.querySelector('.btn-pdf');
                     btn.innerText = "⏳ Generando...";
                     
-                    // Creamos una plantilla HTML "invisible" con formato oficial
                     const plantillaPDF = document.createElement('div');
                     plantillaPDF.style.padding = '40px';
                     plantillaPDF.style.fontFamily = 'Arial, sans-serif';
@@ -400,7 +503,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             <h3 style="margin: 5px 0; color: #333;">Sistema V.I.G.I.A. - Zona Operacional II</h3>
                             <p style="font-size: 0.85rem; color: #666; margin-top:10px;">Fecha de extracción: ${new Date().toLocaleString('es-UY')} <br> Operador Responsable: ${usuarioLogueado}</p>
                         </div>
-
                         <div style="margin-bottom: 20px;">
                             <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">1. DATOS PERSONALES</h3>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Nombres y Apellidos:</b> ${p.nombre} ${p.apellido}</p>
@@ -408,45 +510,39 @@ document.addEventListener('DOMContentLoaded', () => {
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Alias Conocido:</b> ${p.alias || 'Sin registrar'}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Teléfono de Contacto:</b> ${p.telefono || 'Sin registrar'}</p>
                         </div>
-
                         <div style="margin-bottom: 20px;">
                             <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">2. UBICACIÓN TERRITORIAL</h3>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Padrón / Vivienda:</b> ${p.padron_asociado}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Georreferencia (Calle):</b> ${direccion}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Observaciones de Ubicación:</b> ${p.observaciones_seguridad || 'Ninguna'}</p>
                         </div>
-
                         <div style="margin-bottom: 20px;">
                             <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">3. PERFIL DE INTELIGENCIA Y SEGURIDAD</h3>
                             <p style="margin: 5px 0; font-size: 1rem; color: ${p.tiene_antecedentes ? '#dc3545' : '#000'};"><b>Antecedentes Penales:</b> ${p.tiene_antecedentes ? 'SÍ POSEE ANTECEDENTES' : 'NO REGISTRA'}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Situación de Arresto:</b> ${p.arresto_domiciliario !== 'No' ? p.arresto_domiciliario.toUpperCase() + (p.arresto_horario ? ' (Horario: ' + p.arresto_horario + ')' : '') : 'Sin restricciones activas'}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Vehículos Asociados:</b> ${p.vehiculos || 'Ninguno registrado'}</p>
                         </div>
-
                         <div style="margin-bottom: 20px;">
                             <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">4. RELEVAMIENTO SOCIAL (PLAN +BARRIO)</h3>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Conexión a Servicios:</b> ${p.servicios_basicos || 'Carencia total'}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Nivel de Vulnerabilidad:</b> ${p.vulnerabilidad ? 'ALTO RIESGO / CARENCIAS CRÍTICAS' : 'ESTABLE'}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Núcleo Familiar:</b><br> ${p.composicion_familiar || 'Sin datos relevados'}</p>
                         </div>
-                        
                         <div style="margin-top: 40px; text-align: center; border-top: 1px dashed #ccc; padding-top: 20px;">
                             <p style="font-size: 0.8rem; color: #888;">Documento generado automáticamente por el Sistema Táctico V.I.G.I.A.<br>Ministerio del Interior - Uruguay</p>
                         </div>
                     `;
 
-                    // Opciones de configuración del PDF
                     const opcionesPDF = {
                         margin: 10,
                         filename: `Ficha_VIGIA_${p.documento_identidad}.pdf`,
                         image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2 }, // Mejora la nitidez del texto
+                        html2canvas: { scale: 2 },
                         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
                     };
 
-                    // Ejecutar la librería
                     html2pdf().set(opcionesPDF).from(plantillaPDF).save().then(() => {
-                        btn.innerText = "📄 PDF"; // Restaura el botón al terminar
+                        btn.innerText = "📄 PDF";
                         registrarLog(`EXPORTACIÓN A PDF - CI: ${p.documento_identidad}`, 'personas');
                     });
                 });
@@ -458,6 +554,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-admin-panel').addEventListener('click', async () => {
         cambiarVista('admin');
+        await cargarDashboard(); // Carga los gráficos antes de mostrar la tabla
+        
         const { data } = await db.from('logs_auditoria').select('*').order('fecha_hora', { ascending: false }).limit(50);
         const tabla = document.getElementById('tabla-logs');
         tabla.innerHTML = '';
