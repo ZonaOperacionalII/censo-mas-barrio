@@ -101,7 +101,7 @@
         <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px;">
             <div class="input-group">
                 <select id="search-tipo">
-                    <option value="documento_identidad">Cédula de Identidad</option>
+                    <option value="documento_identidad">Cédula / Documento</option>
                     <option value="padron_asociado">Número de Padrón / Vivienda</option>
                     <option value="apellido">Apellido</option>
                     <option value="nombre">Nombre</option>
@@ -123,6 +123,7 @@
             <button id="btn-cerrar-admin" class="btn-accion">Volver</button>
         </div>
 
+        <!-- SECCIÓN DE GRÁFICOS (CHART.JS) -->
         <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
                 <h3 style="margin-top: 0; font-size: 1rem; color: var(--azul-ministerio);">Índice de Vulnerabilidad</h3>
@@ -134,6 +135,7 @@
             </div>
         </div>
 
+        <!-- SECCIÓN DE LOGS -->
         <h3 style="color: var(--azul-ministerio); margin-bottom: 10px;">Auditoría de Operaciones</h3>
         <table style="width: 100%; text-align: left; background: white; border-collapse: collapse; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
             <thead><tr style="background:#002855; color: white; border-bottom:2px solid var(--azul-ministerio);"><th style="padding:10px;">Fecha</th><th style="padding:10px;">Usuario</th><th style="padding:10px;">Acción</th></tr></thead>
@@ -154,11 +156,18 @@
 
             <div class="seccion-titulo">TITULAR RESPONSABLE</div>
             <div style="display: flex; gap: 5px; margin-bottom: 5px; position: relative;">
-                <input type="text" id="censo-ci" class="input-mini" placeholder="Cédula (Sin guiones)" list="cedulas-sugeridas" autocomplete="off" maxlength="8">
+                <input type="text" id="censo-ci" class="input-mini" placeholder="Cédula / Pasaporte" list="cedulas-sugeridas" autocomplete="off" maxlength="15">
                 <datalist id="cedulas-sugeridas"></datalist>
                 <input type="text" id="censo-alias" class="input-mini" placeholder="Alias">
             </div>
-            <p id="ci-alerta" style="display: none; color: #dc3545; font-size: 0.75rem; font-weight: bold; margin: -5px 0 5px 0; background: #ffcccc; padding: 3px 6px; border-radius: 3px;">⚠️ Cédula Inválida (Revise los números)</p>
+
+            <!-- Botón táctico para omitir validación de Cédula -->
+            <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                <input type="checkbox" id="censo-extranjero" style="transform: scale(1.2); margin-right: 8px; cursor: pointer;">
+                <label for="censo-extranjero" style="font-size: 0.85rem; font-weight: bold; color: #555; cursor: pointer;">Documento Extranjero / Pasaporte</label>
+            </div>
+
+            <p id="ci-alerta" style="display: none; color: #dc3545; font-size: 0.75rem; font-weight: bold; margin: 0 0 5px 0; background: #ffcccc; padding: 3px 6px; border-radius: 3px;">⚠️ Cédula Inválida (Revise los números)</p>
             
             <div style="display: flex; gap: 5px; margin-bottom: 5px;">
                 <input type="text" id="censo-nombre" class="input-mini" placeholder="Nombre">
@@ -212,6 +221,7 @@
         </div>
     </div>
 
+    <!-- LIBRERÍAS EXTERNAS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
