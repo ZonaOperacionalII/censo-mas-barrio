@@ -59,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         iniciarApp();
     }
 
-    // --- ALGORITMO MATEMÁTICO DE VALIDACIÓN DE CÉDULA URUGUAYA ---
     function validarCedulaUruguaya(ciNum) {
         if (ciNum.length < 7 || ciNum.length > 8) return false;
         if (ciNum.length === 7) ciNum = '0' + ciNum; 
@@ -73,14 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return digitoVerificador === parseInt(ciNum[7]);
     }
 
-    // Función que evalúa si debe prender la alerta o dejar guardar
     function validarInputCedula() {
         const ciDigitada = document.getElementById('censo-ci').value.trim();
         const esExtranjero = document.getElementById('censo-extranjero').checked;
         const alertaCI = document.getElementById('ci-alerta');
         const btnGuardar = document.getElementById('btn-guardar-censo');
 
-        // Si es extranjero o no ha terminado de tipear al menos 7 números, apagamos la alerta roja
         if (esExtranjero || ciDigitada.length < 7) {
             alertaCI.style.display = 'none';
             btnGuardar.disabled = false;
@@ -100,7 +97,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- PANEL DE ESTADÍSTICAS ---
+    // --- MÓDULO DE NÚCLEO FAMILIAR DINÁMICO ---
+    function agregarFamiliarUI(data = {}) {
+        const div = document.createElement('div');
+        div.className = 'familiar-card';
+        div.innerHTML = `
+            <button type="button" class="btn-remove-fam">X</button>
+            <input type="text" class="input-mini f-nom" placeholder="Nombre completo del familiar" value="${data.nombre || ''}" style="margin-bottom:5px; font-weight:bold;">
+            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <input type="text" class="input-mini f-ci" placeholder="Cédula (Opcional)" value="${data.ci || ''}">
+                <input type="number" class="input-mini f-edad" placeholder="Edad" value="${data.edad || ''}" style="width:70px;">
+            </div>
+            <div class="f-extra" style="display:none; background:#e9ecef; padding:8px; border-radius:4px; margin-top:5px;">
+                <label class="l-estudia" style="display:block; font-size:0.8rem; margin-bottom:6px; color:#333; font-weight:bold;">
+                    <input type="checkbox" class="f-estudia" ${data.estudia ? 'checked' : ''}> Está estudiando actualmente
+                </label>
+                <label style="display:block; font-size:0.8rem; color:#dc3545; font-weight:bold;">
+                    <input type="checkbox" class="f-ant" ${data.antecedentes ? 'checked' : ''}> <span class="lbl-ant">Posee Antecedentes</span>
+                </label>
+            </div>
+        `;
+        
+        const inputEdad = div.querySelector('.f-edad');
+        const fExtra = div.querySelector('.f-extra');
+        const lEstudia = div.querySelector('.l-estudia');
+        const lblAnt = div.querySelector('.lbl-ant');
+
+        const evaluarEdad = () => {
+            const edad = parseInt(inputEdad.value);
+            if (edad >= 15) {
+                fExtra.style.display = 'block';
+                if (edad >= 15 && edad <= 17) {
+                    lEstudia.style.display = 'block';
+                    lblAnt.innerText = "Posee antecedentes de menor (Infracciones)";
+                } else if (edad >= 18) {
+                    lEstudia.style.display = 'none';
+                    div.querySelector('.f-estudia').checked = false;
+                    lblAnt.innerText = "Posee antecedentes penales";
+                }
+            } else {
+                fExtra.style.display = 'none';
+                div.querySelector('.f-estudia').checked = false;
+                div.querySelector('.f-ant').checked = false;
+            }
+        };
+
+        inputEdad.addEventListener('input', evaluarEdad);
+        if (data.edad) evaluarEdad();
+
+        div.querySelector('.btn-remove-fam').addEventListener('click', () => div.remove());
+        document.getElementById('contenedor-familiares').appendChild(div);
+    }
+
+    document.getElementById('btn-add-familiar').addEventListener('click', () => agregarFamiliarUI());
+
     async function cargarDashboard() {
         const { data, error } = await db.from('personas').select('vulnerabilidad, servicios_basicos');
         if (error || !data) return;
@@ -255,14 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('btn-crear-padron').addEventListener('click', () => {
-        padronUbicacionActual = modoPlanoActivo ? 'REALOJO-' + Math.floor(Math.random() * 10000) : 'PROV-' + Math.floor(Math.random() * 1000000);
-        document.getElementById('resultado-padron').innerText = `Padrón Asignado: ${padronUbicacionActual}`;
-        document.getElementById('btn-crear-padron').style.display = 'none';
-        document.getElementById('btn-censar').style.display = 'block';
-    });
-
-    // Detectar cambios en la casilla de Extranjero para reevaluar la validación
     document.getElementById('censo-extranjero').addEventListener('change', validarInputCedula);
 
     document.getElementById('censo-ci').addEventListener('input', async (e) => {
@@ -289,7 +331,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('censo-alias').value = coincidenciaExacta.alias || '';
                     document.getElementById('censo-telefono').value = coincidenciaExacta.telefono || '';
                     document.getElementById('censo-padron-manual').value = coincidenciaExacta.padron_asociado || '';
-                    document.getElementById('censo-familia').value = coincidenciaExacta.composicion_familiar || '';
+                    
+                    document.getElementById('contenedor-familiares').innerHTML = '';
+                    document.getElementById('censo-familia-legacy').value = '';
+                    document.getElementById('censo-familia-legacy').style.display = 'none';
+
+                    if (coincidenciaExacta.composicion_familiar) {
+                        try {
+                            const famArray = JSON.parse(coincidenciaExacta.composicion_familiar);
+                            famArray.forEach(f => {
+                                if(f.legacy) {
+                                    document.getElementById('censo-familia-legacy').value = f.legacy;
+                                    document.getElementById('censo-familia-legacy').style.display = 'block';
+                                } else {
+                                    agregarFamiliarUI(f);
+                                }
+                            });
+                        } catch (err) {
+                            document.getElementById('censo-familia-legacy').value = coincidenciaExacta.composicion_familiar;
+                            document.getElementById('censo-familia-legacy').style.display = 'block';
+                        }
+                    }
+
                     document.getElementById('censo-vehiculos').value = coincidenciaExacta.vehiculos || '';
                     document.getElementById('censo-antecedentes').checked = coincidenciaExacta.tiene_antecedentes || false;
                     document.getElementById('c-estudios').checked = coincidenciaExacta.menores_estudiando || false;
@@ -310,7 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('censo-arresto-horario').style.display = 'none';
                     }
 
-                    // Si se autocompleta un registro que no es cédula uruguaya, marca la casilla automáticamente
                     if (!validarCedulaUruguaya(coincidenciaExacta.documento_identidad.replace(/\D/g, ''))) {
                         document.getElementById('censo-extranjero').checked = true;
                     } else {
@@ -348,6 +410,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const arrestoTipo = document.getElementById('censo-arresto').value;
         const arrestoHora = document.getElementById('censo-arresto-horario').value;
 
+        let nucleoFamiliar = [];
+        document.querySelectorAll('.familiar-card').forEach(card => {
+            const fNom = card.querySelector('.f-nom').value.trim();
+            if(fNom) {
+                nucleoFamiliar.push({
+                    nombre: fNom,
+                    ci: card.querySelector('.f-ci').value.trim(),
+                    edad: card.querySelector('.f-edad').value,
+                    estudia: card.querySelector('.f-estudia').checked,
+                    antecedentes: card.querySelector('.f-ant').checked,
+                    tipoAnt: card.querySelector('.lbl-ant').innerText
+                });
+            }
+        });
+
+        const legacyVal = document.getElementById('censo-familia-legacy').value.trim();
+        let textoFamiliaFinal = "";
+        
+        if (legacyVal && nucleoFamiliar.length === 0) {
+            textoFamiliaFinal = legacyVal;
+        } else if (legacyVal || nucleoFamiliar.length > 0) {
+            if(legacyVal) nucleoFamiliar.push({ legacy: legacyVal });
+            textoFamiliaFinal = JSON.stringify(nucleoFamiliar);
+        }
+
         const esVulnerable = (!luz || !agua || !net || !studies);
         const servicios = [luz?'Luz':'', agua?'Agua':'', net?'Net':''].filter(Boolean).join(', ');
 
@@ -365,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
             observaciones_seguridad: obs,
             padron_asociado: document.getElementById('censo-padron-manual').value || padronUbicacionActual,
             servicios_basicos: servicios,
-            composicion_familiar: document.getElementById('censo-familia').value,
+            composicion_familiar: textoFamiliaFinal,
             menores_estudiando: studies,
             vulnerabilidad: esVulnerable,
             arresto_domiciliario: arrestoTipo,
@@ -386,11 +473,13 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Registro procesado correctamente. Vulnerabilidad: " + (esVulnerable ? "ALTA ⚠️" : "BAJA ✅"));
             document.getElementById('modal-censo').style.display = 'none';
             
-            const camposLimpiar = ['censo-ci','censo-nombre','censo-apellido','censo-alias','censo-telefono','censo-padron-manual','censo-manzana','censo-vivienda', 'censo-familia', 'censo-vehiculos', 'censo-arresto-horario'];
+            const camposLimpiar = ['censo-ci','censo-nombre','censo-apellido','censo-alias','censo-telefono','censo-padron-manual','censo-manzana','censo-vivienda', 'censo-vehiculos', 'censo-arresto-horario', 'censo-familia-legacy'];
             camposLimpiar.forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
             ['c-luz', 'c-agua', 'c-net', 'c-mides', 'c-estudios', 'censo-antecedentes', 'censo-extranjero'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).checked = false; });
             document.getElementById('censo-arresto').value = "No";
             document.getElementById('censo-arresto-horario').style.display = 'none';
+            document.getElementById('contenedor-familiares').innerHTML = '';
+            document.getElementById('censo-familia-legacy').style.display = 'none';
         }
         btn.innerText = "Guardar Datos";
     });
@@ -427,6 +516,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 const alertaAnt = p.tiene_antecedentes ? `<span style="color:#dc3545; font-weight:bold;">| ⚠️ POSEE ANTECEDENTES</span>` : ``;
                 const alertaArresto = (p.arresto_domiciliario && p.arresto_domiciliario !== 'No') ? `<span style="background:#dc3545; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:0.75rem; display:inline-block; margin-top:5px;">🚨 ARRESTO DOMICILIARIO ${p.arresto_domiciliario.toUpperCase()} ${p.arresto_horario ? `(${p.arresto_horario})` : ''}</span>` : ``;
 
+                // Procesar el núcleo familiar para la ficha visual
+                let familiaHtml = "Sin datos de núcleo";
+                if (p.composicion_familiar) {
+                    try {
+                        const famArray = JSON.parse(p.composicion_familiar);
+                        familiaHtml = famArray.map(f => {
+                            if(f.legacy) return `<span style="color:#666;">Datos anteriores: ${f.legacy}</span>`;
+                            let extra = [];
+                            if (f.edad >= 15 && f.edad <= 17) extra.push(`Estudia: ${f.estudia ? 'Sí' : 'No'}`);
+                            if (f.edad >= 15) extra.push(`${f.tipoAnt}: ${f.antecedentes ? '<b style="color:#dc3545;">SÍ</b>' : 'NO'}`);
+                            let extraStr = extra.length > 0 ? `<br><span style="color:#555; font-size:0.8rem;">&nbsp;&nbsp;&nbsp;↳ ${extra.join(' | ')}</span>` : '';
+                            return `• <b>${f.nombre}</b> (CI: ${f.ci || 'S/D'}) - Edad: ${f.edad || 'S/D'} ${extraStr}`;
+                        }).join('<br>');
+                    } catch (e) {
+                        familiaHtml = p.composicion_familiar.replace(/\n/g, '<br>'); // Texto viejo
+                    }
+                }
+
                 const ficha = document.createElement('div');
                 ficha.className = `ficha-resultado ${p.vulnerabilidad || p.tiene_antecedentes || (p.arresto_domiciliario !== 'No') ? 'alerta' : ''}`;
                 ficha.innerHTML = `
@@ -438,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="ficha-datos" style="margin-top:8px;"><b>Servicios:</b> ${p.servicios_basicos || 'Ninguno'}</p>
                     <p class="ficha-datos"><b>Vehículos:</b> ${p.vehiculos || 'Ninguno registrado'}</p>
                     <div class="ficha-obs"><b>Detalles de ubicación:</b><br>${p.observaciones_seguridad || ''}</div>
-                    <div class="ficha-obs"><b>Composición de Familia:</b><br>${p.composicion_familiar || 'Sin datos de núcleo'}</div>
+                    <div class="ficha-obs"><b>Composición de Familia:</b><br>${familiaHtml}</div>
                     <div style="display: flex; gap: 10px; margin-top: 15px;">
                         <button class="btn-mapa" style="flex:1; background: var(--azul-ministerio); color: white; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">📍 Ver en Mapa</button>
                         <button class="btn-editar" style="flex:1; background: #ffc107; color: black; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">✏️ Modificar</button>
@@ -468,10 +575,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('censo-alias').value = p.alias || '';
                     document.getElementById('censo-telefono').value = p.telefono || '';
                     document.getElementById('censo-padron-manual').value = p.padron_asociado || '';
-                    document.getElementById('censo-familia').value = p.composicion_familiar || '';
                     document.getElementById('censo-vehiculos').value = p.vehiculos || '';
                     document.getElementById('censo-antecedentes').checked = p.tiene_antecedentes || false;
                     document.getElementById('c-estudios').checked = p.menores_estudiando || false;
+                    
+                    document.getElementById('contenedor-familiares').innerHTML = '';
+                    document.getElementById('censo-familia-legacy').value = '';
+                    document.getElementById('censo-familia-legacy').style.display = 'none';
+
+                    if (p.composicion_familiar) {
+                        try {
+                            const famArray = JSON.parse(p.composicion_familiar);
+                            famArray.forEach(f => {
+                                if(f.legacy) {
+                                    document.getElementById('censo-familia-legacy').value = f.legacy;
+                                    document.getElementById('censo-familia-legacy').style.display = 'block';
+                                } else {
+                                    agregarFamiliarUI(f);
+                                }
+                            });
+                        } catch (err) {
+                            document.getElementById('censo-familia-legacy').value = p.composicion_familiar;
+                            document.getElementById('censo-familia-legacy').style.display = 'block';
+                        }
+                    }
+
                     if(p.servicios_basicos) {
                         document.getElementById('c-luz').checked = p.servicios_basicos.includes('Luz');
                         document.getElementById('c-agua').checked = p.servicios_basicos.includes('Agua');
@@ -537,7 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <h3 style="background-color: #002855; color: white; padding: 8px 15px; border-radius: 4px; margin-bottom: 10px; font-size: 1.1rem;">4. RELEVAMIENTO SOCIAL (PLAN +BARRIO)</h3>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Conexión a Servicios:</b> ${p.servicios_basicos || 'Carencia total'}</p>
                             <p style="margin: 5px 0; font-size: 1rem;"><b>Nivel de Vulnerabilidad:</b> ${p.vulnerabilidad ? 'ALTO RIESGO / CARENCIAS CRÍTICAS' : 'ESTABLE'}</p>
-                            <p style="margin: 5px 0; font-size: 1rem;"><b>Núcleo Familiar:</b><br> ${p.composicion_familiar || 'Sin datos relevados'}</p>
+                            <p style="margin: 5px 0; font-size: 1rem;"><b>Núcleo Familiar:</b><br> <div style="margin-left: 15px;">${familiaHtml}</div></p>
                         </div>
                         <div style="margin-top: 40px; text-align: center; border-top: 1px dashed #ccc; padding-top: 20px;">
                             <p style="font-size: 0.8rem; color: #888;">Documento generado automáticamente por el Sistema Táctico V.I.G.I.A.<br>Ministerio del Interior - Uruguay</p>
