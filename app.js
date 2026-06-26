@@ -305,6 +305,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- BOTÓN: CREAR PADRÓN PROVISORIO ---
+    document.getElementById('btn-crear-padron').addEventListener('click', () => {
+        padronUbicacionActual = modoPlanoActivo ? 'REALOJO-' + Math.floor(Math.random() * 10000) : 'PROV-' + Math.floor(Math.random() * 1000000);
+        document.getElementById('resultado-padron').innerText = `Padrón Asignado: ${padronUbicacionActual}`;
+        document.getElementById('btn-crear-padron').style.display = 'none';
+        document.getElementById('btn-censar').style.display = 'block';
+    });
+
     document.getElementById('censo-extranjero').addEventListener('change', validarInputCedula);
 
     document.getElementById('censo-ci').addEventListener('input', async (e) => {
@@ -516,7 +524,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const alertaAnt = p.tiene_antecedentes ? `<span style="color:#dc3545; font-weight:bold;">| ⚠️ POSEE ANTECEDENTES</span>` : ``;
                 const alertaArresto = (p.arresto_domiciliario && p.arresto_domiciliario !== 'No') ? `<span style="background:#dc3545; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:0.75rem; display:inline-block; margin-top:5px;">🚨 ARRESTO DOMICILIARIO ${p.arresto_domiciliario.toUpperCase()} ${p.arresto_horario ? `(${p.arresto_horario})` : ''}</span>` : ``;
 
-                // Procesar el núcleo familiar para la ficha visual
                 let familiaHtml = "Sin datos de núcleo";
                 if (p.composicion_familiar) {
                     try {
@@ -530,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             return `• <b>${f.nombre}</b> (CI: ${f.ci || 'S/D'}) - Edad: ${f.edad || 'S/D'} ${extraStr}`;
                         }).join('<br>');
                     } catch (e) {
-                        familiaHtml = p.composicion_familiar.replace(/\n/g, '<br>'); // Texto viejo
+                        familiaHtml = p.composicion_familiar.replace(/\n/g, '<br>');
                     }
                 }
 
